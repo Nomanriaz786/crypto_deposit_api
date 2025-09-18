@@ -1,0 +1,42 @@
+{
+  "name": "crypto-deposit-api",
+  "version": "2.0.0",
+  "description": "Professional NOWPayments integration API for crypto deposits with modular architecture",
+  "main": "src/app.js",
+  "scripts": {
+    "dev": "nodemon src/app.js",
+    "start": "node src/app.js",
+    "build": "echo 'Build complete'",
+    "test": "echo 'No tests specified yet'",
+    "lint": "echo 'No linting configured yet'",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "crypto",
+    "payments",
+    "nowpayments",
+    "nodejs",
+    "api",
+    "cryptocurrency",
+    "deposit",
+    "webhook"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "mongoose": "^8.0.0",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.3.1",
+    "express-validator": "^7.0.1",
+    "express-rate-limit": "^7.1.5"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
