@@ -11,6 +11,10 @@ const connectDB = async () => {
   try {
     mongoose.set('strictQuery', false);
     
+    if (!config.mongoUri) {
+      throw new Error('MongoDB URI is undefined or empty');
+    }
+    
     const conn = await mongoose.connect(config.mongoUri, config.options);
 
     isConnected = conn.connections[0].readyState;

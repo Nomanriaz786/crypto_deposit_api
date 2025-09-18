@@ -3,10 +3,10 @@ const bodyParser = require('body-parser');
 require('dotenv').config();
 
 // Import configuration
-const config = require('./config');
+const config = require('./src/config');
 
 // Import database connection
-const connectDB = require('./config/database');
+const connectDB = require('./src/config/database');
 
 // Import middleware
 const {
@@ -16,13 +16,13 @@ const {
   requestLogger,
   securityHeaders,
   healthCheck
-} = require('./middleware');
+} = require('./src/middleware');
 
 // Import routes
-const paymentRoutes = require('./routes/payments');
-const userRoutes = require('./routes/users');
-const webhookRoutes = require('./routes/webhooks');
-const utilityRoutes = require('./routes');
+const paymentRoutes = require('./src/routes/payments');
+const userRoutes = require('./src/routes/users');
+const webhookRoutes = require('./src/routes/webhooks');
+const utilityRoutes = require('./src/routes');
 
 // Create Express application
 const app = express();
@@ -51,8 +51,13 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // Rate limiting
 app.use('/api', generalLimiter);
 
-// Connect to database
-connectDB();
+// Connect to database (with error handling for serverless)
+try {
+  connectDB();
+} catch (error) {
+  console.error('Database connection failed:', error);
+  // Don't exit in serverless environment
+}
 
 // API Routes
 app.use('/api/payments', paymentRoutes);
@@ -84,34 +89,16 @@ app.use('*', (req, res) => {
 // Error handling middleware (must be last)
 app.use(errorHandler);
 
-// Graceful shutdown handlers
-const gracefulShutdown = (signal) => {
-  console.log(`Received ${signal}, shutting down gracefully...`);
-  
-  server.close(() => {
-    console.log('HTTP server closed');
-    process.exit(0);
-  });
-  
-  // Force close after 30 seconds
-  setTimeout(() => {
-    console.error('Forcefully shutting down');
-    process.exit(1);
-  }, 30000);
-};
-
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-// Start server only in non-production environment (Vercel handles this in production)
-let server;
-if (config.nodeEnv !== 'production') {
-  server = app.listen(config.port, () => {
-    console.log(`🚀 Server running on port ${config.port}`);
-    console.log(`🌍 Environment: ${config.nodeEnv}`);
-    console.log(`📖 API Documentation: http://localhost:${config.port}/api`);
-    console.log(`🏥 Health Check: http://localhost:${config.port}/api/health`);
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`📖 API Documentation: http://localhost:${PORT}/api`);
+    console.log(`🏥 Health Check: http://localhost:${PORT}/api/health`);
   });
 }
 
+// Export for Vercel
 module.exports = app;

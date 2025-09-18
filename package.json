@@ -2,10 +2,10 @@
   "name": "crypto-deposit-api",
   "version": "2.0.0",
   "description": "Professional NOWPayments integration API for crypto deposits with modular architecture",
-  "main": "src/app.js",
+  "main": "server.js",
   "scripts": {
-    "dev": "nodemon src/app.js",
-    "start": "node src/app.js",
+    "dev": "nodemon server.js",
+    "start": "node server.js",
     "build": "echo 'Build complete'",
     "test": "echo 'No tests specified yet'",
     "lint": "echo 'No linting configured yet'",
