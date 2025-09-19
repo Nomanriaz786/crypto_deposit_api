@@ -100,7 +100,7 @@ class NOWPaymentsService {
         price_amount: parseFloat(paymentData.amount),
         price_currency: paymentData.priceCurrency || 'usd',
         pay_currency: paymentData.payCurrency.toLowerCase(),
-        ipn_callback_url: `${config.baseUrl}/api/webhook/ipn`,
+        ipn_callback_url: `${config.baseUrl.replace(/\/$/, '')}/api/webhook/ipn`,
         order_id: paymentData.orderId,
         order_description: paymentData.orderDescription || `Payment for user ${paymentData.userId}`,
         ...paymentData.metadata && { metadata: paymentData.metadata }

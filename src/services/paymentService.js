@@ -5,8 +5,6 @@ const { generateOrderId } = require('../utils/helpers');
 class PaymentService {
   async createPayment(paymentData) {
     try {
-      const orderId = generateOrderId(paymentData.userId);
-      
       const payment = new Payment({
         payment_id: paymentData.payment_id,
         user_id: paymentData.userId,
@@ -15,15 +13,17 @@ class PaymentService {
         pay_address: paymentData.pay_address,
         pay_amount: paymentData.pay_amount,
         status: paymentData.payment_status || 'waiting',
-        order_id: orderId,
+        order_id: paymentData.order_id || generateOrderId(paymentData.userId),
         order_description: paymentData.order_description,
         network: paymentData.network,
         metadata: paymentData.metadata || {}
       });
 
       await payment.save();
+      console.log('Payment saved to database:', payment.payment_id);
       return payment;
     } catch (error) {
+      console.error('Error saving payment to database:', error);
       if (error.code === 11000) {
         throw new ApiError('Payment already exists', 409);
       }

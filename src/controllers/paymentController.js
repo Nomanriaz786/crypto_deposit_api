@@ -6,12 +6,14 @@ class PaymentController {
     try {
       const { amount, payCurrency, userId, orderDescription, metadata } = req.body;
 
+      const orderId = generateOrderId(userId);
+
       // Create payment with NOWPayments
       const nowPaymentData = await nowPaymentsService.createPayment({
         amount,
         payCurrency,
         userId,
-        orderId: generateOrderId(userId),
+        orderId,
         orderDescription,
         metadata
       });
@@ -25,6 +27,7 @@ class PaymentController {
         pay_address: nowPaymentData.data.pay_address,
         pay_amount: nowPaymentData.data.pay_amount || nowPaymentData.data.amount,
         payment_status: nowPaymentData.data.payment_status,
+        order_id: orderId,
         order_description: orderDescription,
         network: nowPaymentData.data.network,
         metadata

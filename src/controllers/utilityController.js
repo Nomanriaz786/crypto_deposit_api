@@ -67,8 +67,15 @@ class UtilityController {
     try {
       const currencies = await nowPaymentsService.getAvailableCurrencies();
       
+      // Filter to show only USDT BSC (BEP-20) and USDT ERC-20
+      const targetCurrencies = ['usdtbsc', 'usdterc20'];
+      
+      const filteredCurrencies = currencies.currencies.filter(currency => {
+        return targetCurrencies.includes(currency.currency.toLowerCase());
+      });
+
       res.json(successResponse(
-        currencies,
+        { currencies: filteredCurrencies },
         'Available currencies retrieved successfully'
       ));
 

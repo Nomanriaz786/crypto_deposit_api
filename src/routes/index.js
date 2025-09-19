@@ -26,7 +26,7 @@ router.get('/currencies', utilityController.getSupportedCurrencies);
 
 /**
  * @route   GET /api/currencies/available
- * @desc    Get available cryptocurrencies with fixed rates
+ * @desc    Get available cryptocurrencies (USDT BSC and USDT ERC-20 only)
  * @access  Public
  */
 router.get('/currencies/available', utilityController.getAvailableCurrencies);

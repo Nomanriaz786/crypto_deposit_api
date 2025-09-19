@@ -15,7 +15,8 @@ const {
   generalLimiter,
   requestLogger,
   securityHeaders,
-  healthCheck
+  healthCheck,
+  ensureDBConnection
 } = require('./src/middleware');
 
 // Import routes
@@ -51,12 +52,26 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 // Rate limiting
 app.use('/api', generalLimiter);
 
+// Database connection middleware (for routes that need DB)
+app.use('/api', ensureDBConnection);
+
 // Connect to database (with error handling for serverless)
-try {
-  connectDB();
-} catch (error) {
-  console.error('Database connection failed:', error);
-  // Don't exit in serverless environment
+const initializeDatabase = async () => {
+  try {
+    await connectDB();
+    console.log('Database initialized successfully');
+  } catch (error) {
+    console.error('Database connection failed:', error.message);
+    // Don't exit in serverless environment, just log the error
+  }
+};
+
+// Initialize database connection
+if (process.env.NODE_ENV === 'development') {
+  initializeDatabase();
+} else {
+  // In production/serverless, connect on first API call
+  console.log('Database will connect on first API call');
 }
 
 // API Routes
