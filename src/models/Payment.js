@@ -153,6 +153,6 @@ paymentSchema.statics.getStatsByUserId = async function(userId) {
   };
 };
 
-const Payment = mongoose.model('Payment', paymentSchema);
+const Payment = mongoose.model('Payment', paymentSchema, 'deposits');
 
 module.exports = Payment;
