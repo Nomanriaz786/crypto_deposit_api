@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { paymentService } = require('../services');
 const { successResponse } = require('../utils');
 
@@ -5,8 +6,15 @@ class WebhookController {
   async handleIPN(req, res, next) {
     try {
       const webhookData = req.body;
+      const receivedSignature = req.headers['x-nowpayments-sig'];
       
       console.log('IPN Webhook received:', JSON.stringify(webhookData, null, 2));
+
+      // Verify IPN signature for security
+      if (!this.verifyIPNSignature(req.body, receivedSignature)) {
+        console.error('Invalid IPN signature');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
 
       // Validate webhook data
       if (!webhookData.payment_id) {
@@ -67,6 +75,46 @@ class WebhookController {
         { error: error.message },
         'IPN received but processing failed'
       ));
+    }
+  }
+
+  verifyIPNSignature(payload, receivedSignature) {
+    try {
+      const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
+      
+      if (!ipnSecret) {
+        console.warn('IPN secret not configured, skipping signature verification');
+        return true; // Allow in development, but warn
+      }
+
+      if (!receivedSignature) {
+        console.error('No signature provided in IPN request');
+        return false;
+      }
+
+      // Create expected signature
+      const payloadString = JSON.stringify(payload);
+      const expectedSignature = crypto
+        .createHmac('sha512', ipnSecret)
+        .update(payloadString)
+        .digest('hex');
+
+      // Compare signatures
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(receivedSignature, 'hex'),
+        Buffer.from(expectedSignature, 'hex')
+      );
+
+      if (!isValid) {
+        console.error('IPN signature verification failed');
+        console.error('Expected:', expectedSignature);
+        console.error('Received:', receivedSignature);
+      }
+
+      return isValid;
+    } catch (error) {
+      console.error('Error verifying IPN signature:', error);
+      return false;
     }
   }
 
