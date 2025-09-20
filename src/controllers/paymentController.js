@@ -1,4 +1,4 @@
-const { nowPaymentsService, paymentService } = require('../services');
+const { nowPaymentsService, paymentFirestoreService } = require('../services');
 const { successResponse, errorResponse, generateOrderId } = require('../utils');
 
 class PaymentController {
@@ -18,8 +18,8 @@ class PaymentController {
         metadata
       });
 
-      // Save payment to database
-      const payment = await paymentService.createPayment({
+      // Save payment to Firestore
+      const payment = await paymentFirestoreService.createPayment({
         payment_id: nowPaymentData.data.payment_id,
         userId,
         amount,
@@ -54,7 +54,7 @@ class PaymentController {
     try {
       const { paymentId } = req.params;
 
-      const payment = await paymentService.getPaymentById(paymentId);
+      const payment = await paymentFirestoreService.getPaymentById(paymentId);
 
       res.json(successResponse({
         payment_id: payment.payment_id,
@@ -79,7 +79,7 @@ class PaymentController {
       const { userId } = req.params;
       const { status, limit = 10, offset = 0 } = req.query;
 
-      const result = await paymentService.getUserPayments(userId, {
+      const result = await paymentFirestoreService.getUserPayments(userId, {
         status,
         limit,
         offset
@@ -100,7 +100,7 @@ class PaymentController {
     try {
       const { userId } = req.params;
 
-      const stats = await paymentService.getUserPaymentStats(userId);
+      const stats = await paymentFirestoreService.getUserPaymentStats(userId);
 
       res.json(successResponse({
         user_id: userId,
@@ -116,8 +116,8 @@ class PaymentController {
     try {
       const { paymentId } = req.params;
 
-      // Get current payment from database
-      const payment = await paymentService.getPaymentById(paymentId);
+      // Get current payment from Firestore
+      const payment = await paymentFirestoreService.getPaymentById(paymentId);
 
       // If payment is already finished, return current status
       if (['finished', 'failed', 'expired', 'refunded'].includes(payment.status)) {
@@ -133,7 +133,7 @@ class PaymentController {
 
       // Update payment if status has changed
       if (nowPaymentStatus.payment_status !== payment.status) {
-        const updatedPayment = await paymentService.updatePaymentStatus(paymentId, {
+        const updatedPayment = await paymentFirestoreService.updatePaymentStatus(paymentId, {
           status: nowPaymentStatus.payment_status,
           pay_amount: nowPaymentStatus.pay_amount || payment.pay_amount,
           actually_paid: nowPaymentStatus.actually_paid

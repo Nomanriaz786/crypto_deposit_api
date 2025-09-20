@@ -18,7 +18,6 @@ class NOWPaymentsService {
     // Request interceptor
     this.client.interceptors.request.use(
       (config) => {
-        console.log(`NOWPayments API Request: ${config.method?.toUpperCase()} ${config.url}`);
         return config;
       },
       (error) => {
@@ -30,7 +29,6 @@ class NOWPaymentsService {
     // Response interceptor
     this.client.interceptors.response.use(
       (response) => {
-        console.log(`NOWPayments API Response: ${response.status} ${response.config.url}`);
         return response;
       },
       (error) => {
@@ -105,8 +103,6 @@ class NOWPaymentsService {
         order_description: paymentData.orderDescription || `Payment for user ${paymentData.userId}`,
         ...paymentData.metadata && { metadata: paymentData.metadata }
       };
-
-      console.log('Creating NOWPayments payment with payload:', JSON.stringify(payload, null, 2));
 
       const response = await this.client.post('/payment', payload);
       

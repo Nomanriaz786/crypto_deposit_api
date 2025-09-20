@@ -1,7 +1,9 @@
 const nowPaymentsService = require('./nowPaymentsService');
-const paymentService = require('./paymentService');
+const paymentFirestoreService = require('./paymentFirestoreService');
+const firestoreService = require('./firestoreService');
 
 module.exports = {
   nowPaymentsService,
-  paymentService
+  paymentFirestoreService,
+  firestoreService
 };

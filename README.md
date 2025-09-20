@@ -1,6 +1,6 @@
-# Professional Crypto Deposit API with NOWPayments
+# Professional Crypto Deposit API with NOWPayments & Firestore
 
-A **production-ready**, modular Node.js API for handling cryptocurrency deposits using NOWPayments integration, built with professional architecture and optimized for Vercel deployment.
+A **production-ready**, modular Node.js API for handling cryptocurrency deposits using NOWPayments integration and Google Firestore database, built with professional architecture and optimized for Vercel serverless deployment.
 
 ## 🏗️ Architecture Overview
 
@@ -12,9 +12,11 @@ CryptoApi/
 │   ├── config/          # Configuration management
 │   ├── controllers/     # Request handlers & business logic
 │   ├── middleware/      # Express middleware (auth, validation, etc.)
-│   ├── models/         # Database models & schemas  
-│   ├── routes/         # API route definitions
-│   ├── services/       # External API integrations & core services
+│   ├── routes/          # API route definitions
+│   ├── services/        # External API integrations & core services
+│   │   ├── firestoreService.js      # Firestore database operations
+│   │   ├── paymentFirestoreService.js # Payment-specific Firestore operations
+│   │   └── nowPaymentsService.js    # NOWPayments API integration
 │   ├── utils/          # Helper functions & utilities
 │   └── app.js          # Main application entry point
 ├── package.json        # Dependencies and scripts
@@ -26,34 +28,73 @@ CryptoApi/
 
 - ✅ **Modular Architecture** - Scalable and maintainable codebase
 - ✅ **NOWPayments Integration** - Support for 200+ cryptocurrencies
+- ✅ **Firestore Database** - Serverless-first NoSQL database from Google
 - ✅ **Advanced Middleware** - Rate limiting, validation, security headers
 - ✅ **Error Handling** - Comprehensive error management with proper HTTP codes
 - ✅ **Webhook Support** - Real-time payment status updates via IPN
 - ✅ **Request Validation** - Input sanitization and validation
-- ✅ **MongoDB Integration** - Optimized database queries with indexing
-- ✅ **Vercel Ready** - Serverless deployment optimization
-- ✅ **Security First** - CORS, rate limiting, security headers
+- ✅ **Vercel Optimized** - Perfect for serverless deployment
+- ✅ **Security First** - CORS, rate limiting, security headers, IPN signature verification
 - ✅ **Logging & Monitoring** - Request logging and health checks
-- ✅ **API Documentation** - Built-in endpoint documentation
+- ✅ **Real-time Updates** - Firestore's real-time capabilities
+- ✅ **Auto-scaling** - Firestore scales automatically with usage
 
 ## 📋 Prerequisites
 
 1. **NOWPayments Account** - [Sign up at NOWPayments.io](https://nowpayments.io)
-2. **MongoDB Database** - [MongoDB Atlas](https://www.mongodb.com/atlas) (recommended)
+2. **Firebase Project** - [Create at Firebase Console](https://console.firebase.google.com/)
 3. **Node.js** - Version 18 or higher
 4. **Vercel Account** - For deployment
 
-## 🛠️ NOWPayments Setup
+## 🛠️ Setup Instructions
+
+### 1. NOWPayments Setup
 
 1. Create account on [NOWPayments.io](https://nowpayments.io)
 2. Complete KYC verification  
 3. Navigate to **Dashboard → API Keys**
-4. Generate and securely store:
-   - **Private API Key (x-api-key)** ⚠️ Keep this secret!
+4. Generate and securely store your **API Key**
+5. Go to **Settings → IPN**
+6. Set webhook URL: `https://your-domain.vercel.app/api/webhook/ipn`
+7. Copy your **IPN Secret Key**
 
-## 📦 Installation & Setup
+### 2. Firebase/Firestore Setup
 
-### Local Development
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Create a new project (or use existing)
+3. Enable **Firestore Database**:
+   - Click "Create database"
+   - Choose "Start in production mode"
+   - Select your region
+4. Get service account credentials:
+   - Go to Project Settings → Service Accounts
+   - Click "Generate new private key"
+   - Download the JSON file
+   - Extract: `project_id`, `private_key`, and `client_email`
+
+### 3. Environment Variables
+
+Create `.env` file in project root:
+
+```bash
+# Firebase/Firestore Configuration
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour-Firebase-Private-Key-Here\n-----END PRIVATE KEY-----\n"
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxx@your-project-id.iam.gserviceaccount.com
+
+# NOWPayments Configuration
+NOWPAYMENTS_API_KEY=XSBDSK7-3X14GKX-MV3FQ6C-24D1056
+NOWPAYMENTS_IPN_SECRET=your-ipn-secret-key
+
+# Server Configuration
+PORT=5000
+NODE_ENV=development
+
+# Base URL for IPN callbacks (set this to your Vercel domain in production)
+BASE_URL=https://your-vercel-domain.vercel.app
+```
+
+### 4. Installation & Setup
 
 ```bash
 # Clone the repository
@@ -63,77 +104,81 @@ cd CryptoApi
 # Install dependencies
 npm install
 
-# Copy environment configuration
-cp .env.example .env
-
-# Edit .env with your credentials
-nano .env
-
-# Install nodemon for development (optional)
-npm install -g nodemon
-
 # Start development server
-npm run dev
+npm start
 ```
 
-### Environment Configuration (.env)
+## 📡 API Endpoints
 
-```env
-# Required - NOWPayments Configuration
-NOWPAYMENTS_API_KEY=your_private_api_key_here
+### Payment Management
+- `POST /api/payments/create` - Create new crypto payment
+- `GET /api/payments/:paymentId` - Get payment status by ID
+- `GET /api/payments/:paymentId/refresh` - Refresh payment status from NOWPayments
 
-# Required - Database Configuration  
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/payments
+### User Management  
+- `GET /api/users/:userId/payments` - Get all payments for a user
+- `GET /api/users/:userId/payments/stats` - Get payment statistics for a user
 
-# Required - Application Configuration
-BASE_URL=https://your-vercel-domain.vercel.app
-NODE_ENV=production
+### Currency & Utility
+- `GET /api/currencies` - Get all available cryptocurrencies  
+- `GET /api/currencies/usdt` - Get only USDT currencies (USDT ERC20 & BSC)
+- `GET /api/estimate` - Get payment amount estimate
+- `GET /api/minimum-amount/:currency` - Get minimum payment amount
 
-# Optional - Advanced Configuration
-CORS_ORIGIN=*
-PORT=5000
+### Webhooks
+- `POST /api/webhook/ipn` - NOWPayments IPN webhook handler
+
+### System
+- `GET /api/health` - Health check endpoint
+- `GET /api` - API information and documentation
+
+## 🔥 Firestore Database Structure
+
+Your Firestore database will have the following structure:
+
+```
+Firestore Database
+└── payments (collection)
+    ├── payment_123456789 (document)
+    │   ├── payment_id: "123456789"
+    │   ├── user_id: "user_abc123"
+    │   ├── amount: 100
+    │   ├── currency: "usdterc20"
+    │   ├── status: "finished"
+    │   ├── pay_address: "0x..."
+    │   ├── pay_amount: 50.123456
+    │   ├── order_id: "ORDER_20250920_001"
+    │   ├── created_at: timestamp
+    │   ├── updated_at: timestamp
+    │   └── metadata: {...}
+    └── payment_987654321 (document)
+        └── ...
 ```
 
-### Vercel Deployment
+## 💳 Payment Flow
+
+1. **User Request**: Frontend sends payment creation request
+2. **API Processing**: 
+   - Validates request data
+   - Calls NOWPayments API to create payment
+   - Stores payment info in Firestore
+   - Returns payment details to user
+3. **User Payment**: User sends crypto to provided address
+4. **Status Updates**: NOWPayments sends webhook to your API
+5. **Database Update**: API updates payment status in Firestore
+6. **Business Logic**: Triggers completion logic (user credit, notifications, etc.)
+
+## 🎯 Payment Creation Example
 
 ```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Login to Vercel
-vercel login
-
-# Deploy (first time)
-vercel
-
-# Or use the npm script for production
-npm run deploy
-
-# Set environment variables in Vercel Dashboard:
-# NOWPAYMENTS_API_KEY
-# MONGODB_URI  
-# BASE_URL
-```
-
-## 🌐 API Documentation
-
-### Base URLs
-- **Local**: `http://localhost:5000`
-- **Production**: `https://your-domain.vercel.app`
-
-### Core Endpoints
-
-#### 1. Create Crypto Deposit
-```http
-POST /api/payments/create
-Content-Type: application/json
-
-{
-  "amount": 100.50,
-  "payCurrency": "usdttrc20", 
-  "userId": "user_12345",
-  "orderDescription": "Premium subscription"
-}
+curl -X POST https://your-api.vercel.app/api/payments/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 100,
+    "payCurrency": "usdterc20",
+    "userId": "user_12345",
+    "orderDescription": "Digital Product Purchase"
+  }'
 ```
 
 **Response:**
@@ -141,286 +186,112 @@ Content-Type: application/json
 {
   "success": true,
   "data": {
-    "payment_id": "5543043316",
-    "pay_address": "TXYZabcdef123456789",
-    "pay_amount": 100.89,
-    "pay_currency": "usdttrc20",
-    "price_amount": 100.50,
-    "price_currency": "usd", 
+    "payment_id": "4831344768",
+    "pay_address": "0x68F7171047Ba353d4bfC5AE64015B6092618dEBB",
+    "pay_amount": 50.123456,
+    "pay_currency": "usdterc20",
+    "price_amount": 100,
+    "price_currency": "usd",
     "payment_status": "waiting",
-    "order_id": "user_12345_1726576200000_a1b2c3d4"
+    "order_id": "ORDER_20250920_001",
+    "created_at": "2025-09-20T10:30:00Z"
   },
-  "message": "Payment created successfully",
-  "timestamp": "2025-09-17T10:30:00.000Z"
+  "message": "Payment created successfully"
 }
 ```
 
-#### 2. Check Payment Status
-```http
-GET /api/payments/{payment_id}
-```
+## 🚀 Vercel Deployment
 
-#### 3. Refresh Payment Status (Force sync with NOWPayments)
-```http  
-GET /api/payments/{payment_id}/refresh
-```
+1. **Connect Repository**:
+   ```bash
+   vercel link
+   ```
 
-#### 4. Get User Payment History
-```http
-GET /api/users/{user_id}/payments?status=finished&limit=10&offset=0
-```
+2. **Set Environment Variables**:
+   ```bash
+   vercel env add FIREBASE_PROJECT_ID
+   vercel env add FIREBASE_PRIVATE_KEY  
+   vercel env add FIREBASE_CLIENT_EMAIL
+   vercel env add NOWPAYMENTS_API_KEY
+   vercel env add NOWPAYMENTS_IPN_SECRET
+   vercel env add BASE_URL
+   ```
 
-#### 5. Get User Payment Statistics
-```http
-GET /api/users/{user_id}/payments/stats
-```
+3. **Deploy**:
+   ```bash
+   vercel --prod
+   ```
 
-#### 6. System Health Check
-```http
-GET /api/health
-```
+## 🔒 Security Features
 
-#### 7. Service Status (includes NOWPayments connectivity)
-```http
-GET /api/status  
-```
+- **Rate Limiting**: Prevents API abuse
+- **Input Validation**: Sanitizes all incoming data
+- **CORS Protection**: Configurable cross-origin requests
+- **Security Headers**: HTTP security headers  
+- **IPN Signature Verification**: Validates webhook authenticity
+- **Firestore Security Rules**: Database-level security
 
-#### 8. Supported Cryptocurrencies
-```http
-GET /api/currencies
-```
+## 🎛️ Environment Configuration
 
-#### 9. Price Estimation
-```http
-GET /api/estimate?amount=100&currency_from=usd&currency_to=btc
-```
+### Development
+- Uses `NODE_ENV=development`
+- Detailed logging enabled
+- CORS allows localhost
 
-### Webhook Endpoint (NOWPayments IPN)
-```http
-POST /api/webhook/ipn
-```
-*This endpoint is automatically called by NOWPayments - configure it in your NOWPayments dashboard*
-
-## 💳 Supported Cryptocurrencies
-
-**Major Cryptocurrencies:**
-- Bitcoin (`btc`)
-- Ethereum (`eth`) 
-- Litecoin (`ltc`)
-- Bitcoin Cash (`bch`)
-
-**Stablecoins:**
-- USDT TRC-20 (`usdttrc20`) 
-- USDT ERC-20 (`usdterc20`)
-- USDT BEP-20 (`usdtbep20`)
-- USDC ERC-20 (`usdcerc20`)
-
-**Altcoins:**  
-- Dogecoin (`doge`)
-- Shiba Inu (`shib`)
-- Polygon (`matic`)
-- Solana (`sol`)
-- And 200+ more...
-
-[View complete list](https://documenter.getpostman.com/view/7907941/S1a32n38)
-
-## 🔄 Complete Payment Flow
-
-1. **Frontend** → Calls `POST /api/payments/create`
-2. **API** → Creates payment with NOWPayments → Returns crypto address  
-3. **User** → Sends crypto to the provided address
-4. **NOWPayments** → Detects payment → Calls `POST /api/webhook/ipn`
-5. **API** → Updates database → Triggers business logic
-6. **Frontend** → Polls `GET /api/payments/{id}` or receives real-time updates
-
-## 📱 Frontend Integration Examples
-
-### JavaScript/Fetch
-```javascript
-// Create payment
-const createPayment = async (amount, currency, userId) => {
-  const response = await fetch(`${API_BASE_URL}/api/payments/create`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ amount, payCurrency: currency, userId })
-  });
-  
-  return await response.json();
-};
-
-// Check status with polling
-const pollPaymentStatus = (paymentId, onStatusUpdate) => {
-  const interval = setInterval(async () => {
-    const response = await fetch(`${API_BASE_URL}/api/payments/${paymentId}`);
-    const data = await response.json();
-    
-    onStatusUpdate(data.data.status);
-    
-    if (['finished', 'failed', 'expired'].includes(data.data.status)) {
-      clearInterval(interval);
-    }
-  }, 10000); // Check every 10 seconds
-};
-```
-
-### Flutter/Dart
-```dart
-class CryptoPaymentService {
-  static const String baseUrl = 'https://your-api.vercel.app';
-  
-  Future<PaymentResponse> createPayment({
-    required double amount,
-    required String currency,
-    required String userId,
-  }) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/payments/create'),
-      headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'amount': amount,
-        'payCurrency': currency,
-        'userId': userId,
-      }),
-    );
-    
-    return PaymentResponse.fromJson(jsonDecode(response.body));
-  }
-}
-```
-
-## 📊 Payment Status Flow
-
-```
-waiting → confirming → confirmed → sending → finished ✅
-   ↓         ↓           ↓         ↓
-failed ❌  failed ❌   failed ❌  failed ❌
-expired ⏱️
-```
-
-**Status Definitions:**
-- `waiting` - Awaiting user payment
-- `confirming` - Payment detected, awaiting blockchain confirmations
-- `confirmed` - Payment confirmed on blockchain  
-- `sending` - Payment being processed by NOWPayments
-- `finished` ✅ - Payment successfully completed
-- `failed` ❌ - Payment failed
-- `expired` ⏱️ - Payment window expired
-- `partially_paid` - Incomplete payment received
+### Production  
+- Uses `NODE_ENV=production`
+- Optimized for Vercel serverless
+- Strict security settings
+- Error details hidden
 
 ## 🔧 Advanced Configuration
 
+### Firestore Indexes
+For better query performance, create indexes in Firebase Console:
+- Composite index: `user_id` + `created_at` (descending)
+- Composite index: `status` + `created_at` (descending)
+
 ### Rate Limiting
-```javascript
-// Default limits (per IP)
-{
-  general: '100 requests per 15 minutes',
-  payments: '10 payment creations per 5 minutes', 
-  webhooks: '100 requests per minute'
-}
-```
+Customize in `src/middleware/rateLimiter.js`:
+- General API: 100 requests/15 minutes
+- Payment creation: 10 requests/15 minutes  
+- Webhooks: 1000 requests/15 minutes
 
-### Database Indexing
-Optimized MongoDB indexes for performance:
-- `payment_id` (unique)
-- `user_id + status` (compound)
-- `created_at` (descending)
-- `status + created_at` (compound)
+## 📊 Monitoring & Analytics
 
-### Security Features
-- CORS configuration
-- Request rate limiting
-- Input validation & sanitization
-- Security headers (XSS, CSRF protection)
-- Environment variable validation
+- **Health Check**: `GET /api/health`
+- **Request Logging**: All API calls logged in development
+- **Error Tracking**: Comprehensive error logging
+- **Payment Analytics**: Built-in payment statistics
 
-## 🐛 Debugging & Logging
+## 🆘 Troubleshooting
 
-### Enable Debug Mode
-```env
-NODE_ENV=development
-```
+### Common Issues
 
-### Common Issues & Solutions
-
-**1. 401 Unauthorized**
+**1. Firestore Permission Denied**
 ```bash
-# Check your NOWPayments API key
-curl -H "x-api-key: YOUR_KEY" https://api.nowpayments.io/v1/status
+# Check your Firebase service account key
+# Ensure FIREBASE_PROJECT_ID is correct
 ```
 
-**2. Webhook Not Receiving**  
-- Verify `BASE_URL` in environment variables
-- Check NOWPayments dashboard webhook settings
-- Test with ngrok for local development
-
-**3. Database Connection Issues**
+**2. IPN Webhook Failures**
 ```bash
-# Test MongoDB connection
-mongosh "mongodb+srv://username:password@cluster.mongodb.net/payments"
+# Verify webhook URL in NOWPayments dashboard
+# Check NOWPAYMENTS_IPN_SECRET matches
 ```
 
-**4. Payment Status Not Updating**
-```javascript
-// Force refresh payment status
-GET /api/payments/{payment_id}/refresh
-```
-
-## 🚀 Performance Optimizations
-
-- **Connection Pooling**: MongoDB connection reuse
-- **Efficient Queries**: Indexed database operations  
-- **Response Caching**: Static currency data caching
-- **Request Validation**: Early input validation
-- **Error Boundaries**: Graceful error handling
-
-## 📈 Monitoring & Analytics
-
-### Health Monitoring
+**3. Payment Not Found**
 ```bash
-# Check API health
-curl https://your-api.vercel.app/api/health
-
-# Check service status  
-curl https://your-api.vercel.app/api/status
+# Ensure payment was saved to Firestore
+# Check Firestore console for documents
 ```
 
-### Payment Analytics
-```bash
-# User payment statistics
-GET /api/users/{user_id}/payments/stats
-```
+## 📝 License
 
-## 🔐 Security Best Practices
+This project is licensed under the MIT License.
 
-- ✅ Never expose API keys in frontend code
-- ✅ Use HTTPS in production (Vercel auto-provides)
-- ✅ Implement webhook signature verification
-- ✅ Validate all user inputs
-- ✅ Use environment variables for sensitive data
-- ✅ Enable rate limiting
-- ✅ Monitor for suspicious activities
+## 🤝 Support
 
-## 📞 Support & Resources
-
-- **NOWPayments Documentation**: [API Docs](https://documenter.getpostman.com/view/7907941/S1a32n38)
-- **Vercel Documentation**: [Deployment Guide](https://vercel.com/docs) 
-- **MongoDB Atlas**: [Setup Guide](https://docs.atlas.mongodb.com/)
-- **Node.js Best Practices**: [Guide](https://github.com/goldbergyoni/nodebestpractices)
-
-## 🔄 Migration from v1.0
-
-If upgrading from the previous version:
-1. Update `package.json` dependencies
-2. Move environment variables to new format
-3. Update API endpoints (new structure)
-4. Test webhook integration
-
-## 📄 License
-
-MIT License - Free for personal and commercial use.
-
----
-
-**🎉 Your professional crypto deposit API is ready for production!**
-
-Built with ❤️ using modern Node.js patterns and industry best practices.
+- **NOWPayments**: [Documentation](https://documenter.getpostman.com/view/7907941/S1a32n38)
+- **Firebase**: [Firestore Documentation](https://firebase.google.com/docs/firestore)
+- **Vercel**: [Deployment Guide](https://vercel.com/docs)

@@ -4,16 +4,19 @@ const config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   baseUrl: process.env.BASE_URL || 'http://localhost:5000',
 
+  // Firebase/Firestore Configuration
+  firebase: {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    privateKey: process.env.FIREBASE_PRIVATE_KEY,
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL
+  },
+
   // NOWPayments Configuration
   nowPayments: {
     apiKey: process.env.NOWPAYMENTS_API_KEY,
+    ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET,
     baseUrl: 'https://api.nowpayments.io/v1',
     sandboxUrl: 'https://api-sandbox.nowpayments.io/v1'
-  },
-
-  // Database Configuration
-  database: {
-    uri: process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/payments'
   },
 
   // Security Configuration
@@ -34,7 +37,9 @@ const config = {
 // Validate required environment variables
 const requiredEnvVars = [
   'NOWPAYMENTS_API_KEY',
-  'MONGODB_URI'
+  'FIREBASE_PROJECT_ID',
+  'FIREBASE_PRIVATE_KEY',
+  'FIREBASE_CLIENT_EMAIL'
 ];
 
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);

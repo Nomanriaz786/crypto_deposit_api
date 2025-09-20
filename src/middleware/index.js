@@ -3,7 +3,6 @@ const errorHandler = require('./errorHandler');
 const { validationRules, validate } = require('./validation');
 const { generalLimiter, paymentLimiter, webhookLimiter } = require('./rateLimiter');
 const { requestLogger, securityHeaders, healthCheck } = require('./common');
-const ensureDBConnection = require('./databaseMiddleware');
 
 module.exports = {
   corsMiddleware,
@@ -15,6 +14,5 @@ module.exports = {
   webhookLimiter,
   requestLogger,
   securityHeaders,
-  healthCheck,
-  ensureDBConnection
+  healthCheck
 };
