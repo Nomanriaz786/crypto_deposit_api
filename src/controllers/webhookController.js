@@ -109,7 +109,18 @@ class WebhookController {
 
   verifyIPNSignature(payload, receivedSignature) {
     try {
-      const ipnSecret = process.env.NOWPAYMENTS_IPN_SECRET;
+      const config = require('../config');
+      const ipnSecret = config.nowPayments.ipnSecret;
+      
+      // In sandbox mode, IPN secret might not be available or functional
+      if (config.nowPayments.isSandbox) {
+        if (!ipnSecret || ipnSecret.trim() === '') {
+          console.warn('🏖️ SANDBOX MODE: No IPN secret configured, skipping signature verification');
+          return true; // Allow webhook in sandbox without verification
+        } else {
+          console.log('🏖️ SANDBOX MODE: Attempting IPN signature verification...');
+        }
+      }
       
       if (!ipnSecret) {
         console.warn('IPN secret not configured, skipping signature verification');
@@ -117,8 +128,13 @@ class WebhookController {
       }
 
       if (!receivedSignature) {
-        console.error('No signature provided in IPN request');
-        return false;
+        if (config.nowPayments.isSandbox) {
+          console.warn('🏖️ SANDBOX MODE: No signature provided, but allowing due to sandbox limitations');
+          return true;
+        } else {
+          console.error('No signature provided in IPN request');
+          return false;
+        }
       }
 
       // Create expected signature
@@ -138,11 +154,26 @@ class WebhookController {
         console.error('IPN signature verification failed');
         console.error('Expected:', expectedSignature);
         console.error('Received:', receivedSignature);
+        
+        if (config.nowPayments.isSandbox) {
+          console.warn('🏖️ SANDBOX MODE: Signature mismatch, but allowing due to sandbox limitations');
+          return true; // Be lenient in sandbox
+        }
+      } else if (config.nowPayments.isSandbox) {
+        console.log('🏖️ SANDBOX MODE: IPN signature verified successfully');
       }
 
-      return isValid;
+      return config.nowPayments.isSandbox ? true : isValid; // Always allow in sandbox
     } catch (error) {
       console.error('Error verifying IPN signature:', error);
+      
+      // Be more lenient in sandbox mode
+      const config = require('../config');
+      if (config.nowPayments.isSandbox) {
+        console.warn('🏖️ SANDBOX MODE: Error during signature verification, but allowing due to sandbox limitations');
+        return true;
+      }
+      
       return false;
     }
   }

@@ -20,6 +20,7 @@ const paymentRoutes = require('./src/routes/payments');
 const userRoutes = require('./src/routes/users');
 const webhookRoutes = require('./src/routes/webhooks');
 const utilityRoutes = require('./src/routes');
+const testRoutes = require('./src/routes/test');
 
 // Create Express application
 const app = express();
@@ -53,6 +54,12 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/webhook', webhookRoutes);
 app.use('/api', utilityRoutes);
+
+// Test routes (only in sandbox mode)
+if (config.nowPayments.isSandbox) {
+  app.use('/api/test', testRoutes);
+  console.log('🧪 Test endpoints enabled in sandbox mode');
+}
 
 // Root endpoint
 app.get('/', (req, res) => {

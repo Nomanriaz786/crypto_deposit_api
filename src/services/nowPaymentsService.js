@@ -6,6 +6,12 @@ class NOWPaymentsService {
   constructor() {
     this.apiKey = config.nowPayments.apiKey;
     this.baseUrl = config.nowPayments.baseUrl;
+    this.isSandbox = config.nowPayments.isSandbox;
+    
+    // Log which environment we're using
+    console.log(`🔧 NOWPayments initialized in ${this.isSandbox ? 'SANDBOX' : 'PRODUCTION'} mode`);
+    console.log(`📡 Using API endpoint: ${this.baseUrl}`);
+    
     this.client = axios.create({
       baseURL: this.baseUrl,
       headers: {

@@ -13,34 +13,49 @@ const config = {
 
   // NOWPayments Configuration
   nowPayments: {
-    apiKey: process.env.NOWPAYMENTS_API_KEY,
-    ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET,
-    baseUrl: 'https://api.nowpayments.io/v1',
-    sandboxUrl: 'https://api-sandbox.nowpayments.io/v1'
+    // Use sandbox or production credentials based on NOWPAYMENTS_SANDBOX flag
+    apiKey: process.env.NOWPAYMENTS_SANDBOX === 'true' 
+      ? process.env.NOWPAYMENTS_SANDBOX_API_KEY 
+      : process.env.NOWPAYMENTS_API_KEY,
+    ipnSecret: process.env.NOWPAYMENTS_SANDBOX === 'true'
+      ? process.env.NOWPAYMENTS_SANDBOX_IPN_SECRET
+      : process.env.NOWPAYMENTS_IPN_SECRET,
+    baseUrl: process.env.NOWPAYMENTS_SANDBOX === 'true' 
+      ? 'https://api-sandbox.nowpayments.io/v1'
+      : 'https://api.nowpayments.io/v1',
+    sandboxUrl: 'https://api-sandbox.nowpayments.io/v1',
+    productionUrl: 'https://api.nowpayments.io/v1',
+    isSandbox: process.env.NOWPAYMENTS_SANDBOX === 'true'
   },
 
   // Security Configuration
   security: {
     corsOrigin: process.env.CORS_ORIGIN || '*',
-    rateLimitWindowMs: 15 * 60 * 1000, // 15 minutes
-    rateLimitMax: 100 // limit each IP to 100 requests per windowMs
+    rateLimitWindowMs: 15 * 60 * 1000,
+    rateLimitMax: 100
   },
 
   // Application Configuration
   app: {
     defaultCurrency: 'usd',
-    paymentTimeout: 24 * 60 * 60 * 1000, // 24 hours in milliseconds
+    paymentTimeout: 24 * 60 * 60 * 1000,
     webhookRetries: 3
   }
 };
 
 // Validate required environment variables
 const requiredEnvVars = [
-  'NOWPAYMENTS_API_KEY',
   'FIREBASE_PROJECT_ID',
   'FIREBASE_PRIVATE_KEY',
   'FIREBASE_CLIENT_EMAIL'
 ];
+
+// Add NOWPayments credentials based on sandbox mode
+if (process.env.NOWPAYMENTS_SANDBOX === 'true') {
+  requiredEnvVars.push('NOWPAYMENTS_SANDBOX_API_KEY', 'NOWPAYMENTS_SANDBOX_IPN_SECRET');
+} else {
+  requiredEnvVars.push('NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_IPN_SECRET');
+}
 
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
 
