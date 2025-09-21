@@ -52,8 +52,10 @@ const requiredEnvVars = [
 
 // Add NOWPayments credentials based on sandbox mode
 if (process.env.NOWPAYMENTS_SANDBOX === 'true') {
-  requiredEnvVars.push('NOWPAYMENTS_SANDBOX_API_KEY', 'NOWPAYMENTS_SANDBOX_IPN_SECRET');
+  // Only require API key for sandbox, IPN secret is optional
+  requiredEnvVars.push('NOWPAYMENTS_SANDBOX_API_KEY');
 } else {
+  // Production requires both API key and IPN secret
   requiredEnvVars.push('NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_IPN_SECRET');
 }
 
