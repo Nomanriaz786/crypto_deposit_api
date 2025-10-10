@@ -3,8 +3,8 @@ const { ApiError } = require('../utils/errors');
 const { generateOrderId } = require('../utils/helpers');
 
 class PaymentFirestoreService {
-  constructor() {
-    this.collectionName = 'payments';
+  constructor(collectionName = 'payments') {
+    this.collectionName = collectionName;
   }
 
   async createPayment(paymentData) {
@@ -213,4 +213,4 @@ class PaymentFirestoreService {
   }
 }
 
-module.exports = new PaymentFirestoreService();
+module.exports = PaymentFirestoreService;

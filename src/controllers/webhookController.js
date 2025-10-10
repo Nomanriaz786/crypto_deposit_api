@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { paymentFirestoreService } = require('../services');
+const { createNowPaymentsService, createPaymentFirestoreService, firestoreService } = require('../services');
 const { successResponse } = require('../utils');
 
 class WebhookController {
@@ -10,28 +10,36 @@ class WebhookController {
       
       console.log('IPN Webhook received:', JSON.stringify(webhookData, null, 2));
 
-      // Verify IPN signature for security
-      if (!this.verifyIPNSignature(req.body, receivedSignature)) {
-        console.error('Invalid IPN signature');
-        return res.status(401).json({ error: 'Invalid signature' });
-      }
-
       // Validate webhook data
       if (!webhookData.payment_id) {
         console.error('Missing payment_id in webhook data');
         return res.status(400).json({ error: 'Missing payment_id' });
       }
 
+      // Determine category by checking all collections
+      const category = await this.determineCategory(webhookData.payment_id);
+      if (!category) {
+        console.error(`Payment not found in any collection: ${webhookData.payment_id}`);
+        return res.status(404).json({ error: 'Payment not found' });
+      }
+
+      console.log(`Payment ${webhookData.payment_id} belongs to category: ${category}`);
+
+      // Create category-specific services
+      const nowPaymentsService = createNowPaymentsService(category);
+      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
+
+      // Verify IPN signature using scenario-specific service
+      if (!nowPaymentsService.verifyIPNSignature(webhookData, receivedSignature)) {
+        console.error('Invalid IPN signature');
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+
       // Increment webhook attempts counter
       await paymentFirestoreService.incrementWebhookAttempts(webhookData.payment_id);
 
-      // Find payment in Firestore
+      // Find payment in the appropriate collection
       const payment = await paymentFirestoreService.getPaymentById(webhookData.payment_id);
-
-      if (!payment) {
-        console.error(`Payment not found: ${webhookData.payment_id}`);
-        return res.status(404).json({ error: 'Payment not found' });
-      }
 
       console.log(
         `Processing IPN for payment ${webhookData.payment_id}: ${payment.status} -> ${webhookData.payment_status}`
@@ -91,7 +99,7 @@ class WebhookController {
 
       // Always respond with 200 to acknowledge receipt
       res.status(200).json(successResponse(
-        { payment_id: webhookData.payment_id },
+        { payment_id: webhookData.payment_id, category: category },
         'IPN processed successfully'
       ));
 
@@ -104,77 +112,6 @@ class WebhookController {
         { error: error.message },
         'IPN received but processing failed'
       ));
-    }
-  }
-
-  verifyIPNSignature(payload, receivedSignature) {
-    try {
-      const config = require('../config');
-      const ipnSecret = config.nowPayments.ipnSecret;
-      
-      // In sandbox mode, IPN secret might not be available or functional
-      if (config.nowPayments.isSandbox) {
-        if (!ipnSecret || ipnSecret.trim() === '') {
-          console.warn('🏖️ SANDBOX MODE: No IPN secret configured, skipping signature verification');
-          return true; // Allow webhook in sandbox without verification
-        } else {
-          console.log('🏖️ SANDBOX MODE: Attempting IPN signature verification...');
-        }
-      }
-      
-      if (!ipnSecret) {
-        console.warn('IPN secret not configured, skipping signature verification');
-        return true; // Allow in development, but warn
-      }
-
-      if (!receivedSignature) {
-        if (config.nowPayments.isSandbox) {
-          console.warn('🏖️ SANDBOX MODE: No signature provided, but allowing due to sandbox limitations');
-          return true;
-        } else {
-          console.error('No signature provided in IPN request');
-          return false;
-        }
-      }
-
-      // Create expected signature
-      const payloadString = JSON.stringify(payload);
-      const expectedSignature = crypto
-        .createHmac('sha512', ipnSecret)
-        .update(payloadString)
-        .digest('hex');
-
-      // Compare signatures
-      const isValid = crypto.timingSafeEqual(
-        Buffer.from(receivedSignature, 'hex'),
-        Buffer.from(expectedSignature, 'hex')
-      );
-
-      if (!isValid) {
-        console.error('IPN signature verification failed');
-        console.error('Expected:', expectedSignature);
-        console.error('Received:', receivedSignature);
-        
-        if (config.nowPayments.isSandbox) {
-          console.warn('🏖️ SANDBOX MODE: Signature mismatch, but allowing due to sandbox limitations');
-          return true; // Be lenient in sandbox
-        }
-      } else if (config.nowPayments.isSandbox) {
-        console.log('🏖️ SANDBOX MODE: IPN signature verified successfully');
-      }
-
-      return config.nowPayments.isSandbox ? true : isValid; // Always allow in sandbox
-    } catch (error) {
-      console.error('Error verifying IPN signature:', error);
-      
-      // Be more lenient in sandbox mode
-      const config = require('../config');
-      if (config.nowPayments.isSandbox) {
-        console.warn('🏖️ SANDBOX MODE: Error during signature verification, but allowing due to sandbox limitations');
-        return true;
-      }
-      
-      return false;
     }
   }
 
@@ -473,6 +410,27 @@ class WebhookController {
     } catch (error) {
       console.error(`Error handling partial payment ${payment.payment_id}:`, error);
     }
+  }
+
+  async determineCategory(paymentId) {
+    const categories = ['packages', 'matrix', 'lottery'];
+    
+    for (const category of categories) {
+      try {
+        const collectionName = config.getCollectionForCategory(category);
+        
+        // Try to get the document from this collection
+        const payment = await firestoreService.getDocument(collectionName, paymentId);
+        if (payment) {
+          return category;
+        }
+      } catch (error) {
+        // Continue to next category if not found
+        continue;
+      }
+    }
+    
+    return null; // Payment not found in any collection
   }
 }
 

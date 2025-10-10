@@ -1,36 +1,60 @@
-const { nowPaymentsService, paymentFirestoreService } = require('../services');
+const { createNowPaymentsService, createPaymentFirestoreService } = require('../services');
 const { successResponse, errorResponse, generateOrderId } = require('../utils');
+const config = require('../config');
 
 class PaymentController {
   async createDeposit(req, res, next) {
     try {
-      const { amount, payCurrency, userId, orderDescription, metadata } = req.body;
+      const { amount, payCurrency, userId, orderDescription, metadata, category = 'packages' } = req.body;
+
+      // Validate category
+      const validCategories = ['packages', 'matrix', 'lottery'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+      }
+
+      // Validate amount
+      const parsedAmount = parseFloat(amount);
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        return res.status(400).json(errorResponse('Invalid amount. Must be a positive number.'));
+      }
+
+      // Validate payCurrency
+      if (!payCurrency || typeof payCurrency !== 'string' || payCurrency.trim() === '') {
+        return res.status(400).json(errorResponse('Invalid pay currency. Must be a non-empty string.'));
+      }
 
       const orderId = generateOrderId(userId);
 
+      // Create category-specific services
+      const nowPaymentsService = createNowPaymentsService(category);
+      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
+
       // Create payment with NOWPayments
       const nowPaymentData = await nowPaymentsService.createPayment({
-        amount,
-        payCurrency,
+        amount: parsedAmount,
+        payCurrency: payCurrency.trim(),
         userId,
         orderId,
-        orderDescription,
-        metadata
+        orderDescription: orderDescription || `Payment for user ${userId} - Category: ${category}`,
       });
 
       // Save payment to Firestore
       const payment = await paymentFirestoreService.createPayment({
         payment_id: nowPaymentData.data.payment_id,
         userId,
-        amount,
-        payCurrency,
+        amount: parsedAmount,
+        payCurrency: payCurrency.trim(),
         pay_address: nowPaymentData.data.pay_address,
         pay_amount: nowPaymentData.data.pay_amount || nowPaymentData.data.amount,
         payment_status: nowPaymentData.data.payment_status,
         order_id: orderId,
-        order_description: orderDescription,
+        order_description: orderDescription || `Payment for user ${userId} - Category: ${category}`,
         network: nowPaymentData.data.network,
-        metadata
+        metadata: {
+          ...metadata,
+          category
+        }
       });
 
       res.status(201).json(successResponse({
@@ -42,6 +66,7 @@ class PaymentController {
         price_currency: 'usd',
         payment_status: payment.status,
         order_id: payment.order_id,
+        category: category,
         created_at: payment.created_at
       }, 'Payment created successfully'));
 
@@ -53,7 +78,15 @@ class PaymentController {
   async getPaymentStatus(req, res, next) {
     try {
       const { paymentId } = req.params;
+      const { category = 'packages' } = req.query;
 
+      // Validate category
+      const validCategories = ['packages', 'matrix', 'lottery'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+      }
+
+      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
       const payment = await paymentFirestoreService.getPaymentById(paymentId);
 
       res.json(successResponse({
@@ -66,7 +99,8 @@ class PaymentController {
         pay_amount: payment.pay_amount,
         created_at: payment.created_at,
         updated_at: payment.updated_at,
-        order_id: payment.order_id
+        order_id: payment.order_id,
+        category: category
       }));
 
     } catch (error) {
@@ -77,8 +111,15 @@ class PaymentController {
   async getUserPayments(req, res, next) {
     try {
       const { userId } = req.params;
-      const { status, limit = 10, offset = 0 } = req.query;
+      const { status, limit = 10, offset = 0, category = 'packages' } = req.query;
 
+      // Validate category
+      const validCategories = ['packages', 'matrix', 'lottery'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+      }
+
+      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
       const result = await paymentFirestoreService.getUserPayments(userId, {
         status,
         limit,
@@ -99,11 +140,20 @@ class PaymentController {
   async getUserPaymentStats(req, res, next) {
     try {
       const { userId } = req.params;
+      const { category = 'packages' } = req.query;
 
+      // Validate category
+      const validCategories = ['packages', 'matrix', 'lottery'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+      }
+
+      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
       const stats = await paymentFirestoreService.getUserPaymentStats(userId);
 
       res.json(successResponse({
         user_id: userId,
+        category: category,
         ...stats
       }, 'Payment statistics retrieved successfully'));
 
@@ -115,6 +165,16 @@ class PaymentController {
   async refreshPaymentStatus(req, res, next) {
     try {
       const { paymentId } = req.params;
+      const { category = 'packages' } = req.query;
+
+      // Validate category
+      const validCategories = ['packages', 'matrix', 'lottery'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+      }
+
+      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
+      const nowPaymentsService = createNowPaymentsService(category);
 
       // Get current payment from Firestore
       const payment = await paymentFirestoreService.getPaymentById(paymentId);

@@ -1,15 +1,29 @@
 const axios = require('axios');
+const crypto = require('crypto');
 const config = require('../config');
 const { ApiError } = require('../utils/errors');
 
 class NOWPaymentsService {
-  constructor() {
-    this.apiKey = config.nowPayments.apiKey;
-    this.baseUrl = config.nowPayments.baseUrl;
-    this.isSandbox = config.nowPayments.isSandbox;
+  constructor(category = null) {
+    // If category is provided, use category-specific config
+    if (category) {
+      const categoryConfig = config.getCategoryConfig(category);
+      this.apiKey = categoryConfig.apiKey;
+      this.ipnSecret = categoryConfig.ipnSecret;
+      this.baseUrl = categoryConfig.baseUrl;
+      this.isSandbox = categoryConfig.isSandbox;
+      this.category = category;
+    } else {
+      // Legacy mode for backward compatibility
+      this.apiKey = config.nowPayments.apiKey;
+      this.baseUrl = config.nowPayments.baseUrl;
+      this.ipnSecret = config.nowPayments.ipnSecret;
+      this.isSandbox = config.nowPayments.isSandbox;
+      this.category = 'legacy';
+    }
     
     // Log which environment we're using
-    console.log(`🔧 NOWPayments initialized in ${this.isSandbox ? 'SANDBOX' : 'PRODUCTION'} mode`);
+    console.log(`🔧 NOWPayments initialized for category: ${this.category} in ${this.isSandbox ? 'SANDBOX' : 'PRODUCTION'} mode`);
     console.log(`📡 Using API endpoint: ${this.baseUrl}`);
     
     this.client = axios.create({
@@ -104,11 +118,16 @@ class NOWPaymentsService {
         price_amount: parseFloat(paymentData.amount),
         price_currency: paymentData.priceCurrency || 'usd',
         pay_currency: paymentData.payCurrency.toLowerCase(),
-        ipn_callback_url: `${config.baseUrl.replace(/\/$/, '')}/api/webhook/ipn`,
         order_id: paymentData.orderId,
         order_description: paymentData.orderDescription || `Payment for user ${paymentData.userId}`,
-        ...paymentData.metadata && { metadata: paymentData.metadata }
       };
+
+      // Add IPN callback URL only if not in sandbox mode or if it's a public URL
+      if (!this.isSandbox || (config.baseUrl && !config.baseUrl.includes('localhost'))) {
+        payload.ipn_callback_url = `${config.baseUrl.replace(/\/$/, '')}/api/webhook/ipn`;
+      }
+
+      console.log('NOWPayments create payment payload:', JSON.stringify(payload, null, 2));
 
       const response = await this.client.post('/payment', payload);
       
@@ -170,20 +189,77 @@ class NOWPaymentsService {
     }
   }
 
-  // Utility method to check if payment is successful
-  isPaymentSuccessful(status) {
-    return status === 'finished';
-  }
+  verifyIPNSignature(payload, receivedSignature, category = null) {
+    try {
+      // Use category-specific IPN secret if category provided, otherwise use instance IPN secret
+      const ipnSecret = category ? config.getCategoryConfig(category).ipnSecret : this.ipnSecret;
+      const isSandbox = category ? config.getCategoryConfig(category).isSandbox : this.isSandbox;
+      
+      // In sandbox mode, IPN secret might not be available or functional
+      if (isSandbox) {
+        if (!ipnSecret || ipnSecret.trim() === '') {
+          console.warn(`🏖️ SANDBOX MODE (${category || this.category}): No IPN secret configured, skipping signature verification`);
+          return true; // Allow webhook in sandbox without verification
+        } else {
+          console.log(`🏖️ SANDBOX MODE (${category || this.category}): Attempting IPN signature verification...`);
+        }
+      }
+      
+      if (!ipnSecret) {
+        console.warn(`IPN secret not configured for category ${category || this.category}, skipping signature verification`);
+        return true; // Allow in development, but warn
+      }
 
-  // Utility method to check if payment is pending
-  isPaymentPending(status) {
-    return ['waiting', 'confirming', 'confirmed', 'sending'].includes(status);
-  }
+      if (!receivedSignature) {
+        if (isSandbox) {
+          console.warn(`🏖️ SANDBOX MODE (${category || this.category}): No signature provided, but allowing due to sandbox limitations`);
+          return true;
+        } else {
+          console.error('No signature provided in IPN request');
+          return false;
+        }
+      }
 
-  // Utility method to check if payment has failed
-  isPaymentFailed(status) {
-    return ['failed', 'expired', 'refunded'].includes(status);
+      // Create expected signature
+      const payloadString = JSON.stringify(payload);
+      const expectedSignature = crypto
+        .createHmac('sha512', ipnSecret)
+        .update(payloadString)
+        .digest('hex');
+
+      // Compare signatures
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(receivedSignature, 'hex'),
+        Buffer.from(expectedSignature, 'hex')
+      );
+
+      if (!isValid) {
+        console.error('IPN signature verification failed');
+        console.error('Expected:', expectedSignature);
+        console.error('Received:', receivedSignature);
+        
+        if (isSandbox) {
+          console.warn(`🏖️ SANDBOX MODE (${category || this.category}): Signature mismatch, but allowing due to sandbox limitations`);
+          return true; // Be lenient in sandbox
+        }
+      } else if (isSandbox) {
+        console.log(`🏖️ SANDBOX MODE (${category || this.category}): IPN signature verified successfully`);
+      }
+
+      return isSandbox ? true : isValid; // Always allow in sandbox
+    } catch (error) {
+      console.error('Error verifying IPN signature:', error);
+      
+      // Be more lenient in sandbox mode
+      const isSandboxCheck = category ? config.getCategoryConfig(category).isSandbox : this.isSandbox;
+      if (isSandboxCheck) {
+        console.warn(`🏖️ SANDBOX MODE (${category || this.category}): Error during signature verification, but allowing due to sandbox limitations`);
+        return true;
+      }
+      
+      return false;
+    }
   }
 }
 
-module.exports = new NOWPaymentsService();
+module.exports = NOWPaymentsService;

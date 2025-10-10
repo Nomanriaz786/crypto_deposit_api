@@ -11,15 +11,32 @@ const config = {
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL
   },
 
-  // NOWPayments Configuration
+  // NOWPayments Configuration for different categories
   nowPayments: {
-    // Use sandbox or production credentials based on NOWPAYMENTS_SANDBOX flag
+    categories: {
+      packages: {
+        apiKey: process.env.NOWPAYMENTS_API_KEY_PACKAGES,
+        ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_PACKAGES,
+        collection: 'payments'
+      },
+      matrix: {
+        apiKey: process.env.NOWPAYMENTS_API_KEY_MATRIX,
+        ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_MATRIX,
+        collection: 'matrix_payments'
+      },
+      lottery: {
+        apiKey: process.env.NOWPAYMENTS_API_KEY_LOTTERY,
+        ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_LOTTERY,
+        collection: 'lottery_payments'
+      }
+    },
+    // Legacy configuration for backward compatibility
     apiKey: process.env.NOWPAYMENTS_SANDBOX === 'true' 
       ? process.env.NOWPAYMENTS_SANDBOX_API_KEY 
-      : process.env.NOWPAYMENTS_API_KEY,
+      : process.env.NOWPAYMENTS_API_KEY_PACKAGES, // Default to packages
     ipnSecret: process.env.NOWPAYMENTS_SANDBOX === 'true'
       ? process.env.NOWPAYMENTS_SANDBOX_IPN_SECRET
-      : process.env.NOWPAYMENTS_IPN_SECRET,
+      : process.env.NOWPAYMENTS_IPN_SECRET_PACKAGES, // Default to packages
     baseUrl: process.env.NOWPAYMENTS_SANDBOX === 'true' 
       ? 'https://api-sandbox.nowpayments.io/v1'
       : 'https://api.nowpayments.io/v1',
@@ -55,8 +72,15 @@ if (process.env.NOWPAYMENTS_SANDBOX === 'true') {
   // Only require API key for sandbox, IPN secret is optional
   requiredEnvVars.push('NOWPAYMENTS_SANDBOX_API_KEY');
 } else {
-  // Production requires both API key and IPN secret
-  requiredEnvVars.push('NOWPAYMENTS_API_KEY', 'NOWPAYMENTS_IPN_SECRET');
+  // Production requires scenario-specific credentials
+  requiredEnvVars.push(
+    'NOWPAYMENTS_API_KEY_PACKAGES',
+    'NOWPAYMENTS_IPN_SECRET_PACKAGES',
+    'NOWPAYMENTS_API_KEY_MATRIX',
+    'NOWPAYMENTS_IPN_SECRET_MATRIX',
+    'NOWPAYMENTS_API_KEY_LOTTERY',
+    'NOWPAYMENTS_IPN_SECRET_LOTTERY'
+  );
 }
 
 const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar]);
@@ -67,3 +91,35 @@ if (missingEnvVars.length > 0 && process.env.NODE_ENV === 'production') {
 }
 
 module.exports = config;
+
+// Helper function to get category configuration
+config.getCategoryConfig = (category) => {
+  const categoryConfig = config.nowPayments.categories[category];
+  if (!categoryConfig) {
+    throw new Error(`Invalid category: ${category}. Valid categories: ${Object.keys(config.nowPayments.categories).join(', ')}`);
+  }
+  
+  // In sandbox mode, use sandbox credentials regardless of category
+  if (config.nowPayments.isSandbox) {
+    return {
+      apiKey: config.nowPayments.apiKey, // This will be the sandbox API key
+      ipnSecret: config.nowPayments.ipnSecret, // This will be the sandbox IPN secret
+      collection: categoryConfig.collection,
+      baseUrl: config.nowPayments.baseUrl,
+      isSandbox: config.nowPayments.isSandbox
+    };
+  }
+  
+  // In production, use category-specific credentials
+  return {
+    ...categoryConfig,
+    baseUrl: config.nowPayments.baseUrl,
+    isSandbox: config.nowPayments.isSandbox
+  };
+};
+
+// Helper function to get collection name for category
+config.getCollectionForCategory = (category) => {
+  const categoryConfig = config.getCategoryConfig(category);
+  return categoryConfig.collection;
+};

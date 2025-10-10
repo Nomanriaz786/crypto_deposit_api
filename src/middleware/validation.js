@@ -16,6 +16,10 @@ const validationRules = {
       .withMessage('User ID is required')
       .isLength({ min: 1, max: 100 })
       .withMessage('User ID must be between 1-100 characters'),
+    body('category')
+      .optional()
+      .isIn(['packages', 'matrix', 'lottery'])
+      .withMessage('Category must be one of: packages, matrix, lottery'),
     body('orderDescription')
       .optional()
       .isLength({ max: 500 })
@@ -27,7 +31,11 @@ const validationRules = {
       .notEmpty()
       .withMessage('Payment ID is required')
       .isLength({ min: 1, max: 100 })
-      .withMessage('Invalid payment ID format')
+      .withMessage('Invalid payment ID format'),
+    query('category')
+      .optional()
+      .isIn(['packages', 'matrix', 'lottery'])
+      .withMessage('Category must be one of: packages, matrix, lottery')
   ],
   
   getUserPayments: [
@@ -36,6 +44,10 @@ const validationRules = {
       .withMessage('User ID is required')
       .isLength({ min: 1, max: 100 })
       .withMessage('Invalid user ID format'),
+    query('category')
+      .optional()
+      .isIn(['packages', 'matrix', 'lottery'])
+      .withMessage('Category must be one of: packages, matrix, lottery'),
     query('status')
       .optional()
       .isIn(['waiting', 'confirming', 'confirmed', 'sending', 'partially_paid', 'finished', 'failed', 'refunded', 'expired'])
