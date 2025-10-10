@@ -2,10 +2,22 @@
 
 ### Troubleshooting Common Issues
 
-#### ❌ "Payment simulation failed" Error
+#### ✅ **Fixed: Internal Server Error in Simulation**
+**Problem:** Getting "Payment simulation failed" with 500 status code.
+
+**Root Cause:** The test controller was using the legacy Firestore service that only checked the default 'payments' collection, but payments are stored in category-specific collections (payments, matrix_payments, lottery_payments).
+
+**Solution:** Updated the test controller to:
+- Use category-specific Firestore services
+- Automatically determine payment category before simulation
+- Handle all three categories (packages, matrix, lottery)
+
+**Status:** ✅ **RESOLVED** - Simulation now works correctly and returns category information.
+
+#### ❌ "Payment simulation failed" Error (Different Issue)
 **Problem:** You're trying to simulate a webhook for a payment that doesn't exist in the database.
 
-**Solution:** 
+**Solution:**
 1. First create a real payment using `POST /api/payments/create`
 2. Copy the `payment_id` from the response
 3. Use that real `payment_id` in your simulation requests
@@ -33,25 +45,6 @@ POST /api/test/webhook/simulate
   "payment_status": "finished"
 }
 ```
-
-### Order Description Behavior
-
-**✅ Yes, order descriptions are provided and enhanced:**
-
-1. **If you provide `orderDescription`**: It's used as-is
-2. **If you don't provide `orderDescription`**: System generates: `"Payment for user {userId} - Category: {category}"`
-3. **NOWPayments API**: Receives the order description for transaction records
-4. **Firestore**: Stores the same order description for reference
-
-**Example:**
-- Input: `"orderDescription": "Package purchase payment"`
-- Stored: `"Package purchase payment"`
-- NOWPayments: `"Package purchase payment"`
-
-**Example (no description provided):**
-- Input: (none)
-- Stored: `"Payment for user test-user-123 - Category: packages"`
-- NOWPayments: `"Payment for user test-user-123 - Category: packages"`
 
 ### Step 1: Create a Test Payment
 
@@ -268,5 +261,235 @@ GET https://crypto-api-pi.vercel.app/api/payments/YOUR_LOTTERY_PAYMENT_ID?catego
     "webhook_attempts": 4,
     "category": "packages"
   }
+}
+```
+
+### Step 6: Test Withdrawal APIs
+
+**⚠️ IMPORTANT: Withdrawals require sufficient balance and valid addresses!**
+
+#### Create Packages Withdrawal
+```http
+POST https://crypto-api-pi.vercel.app/api/withdrawals/create
+Content-Type: application/json
+
+{
+  "amount": "0.001",
+  "currency": "btc",
+  "withdrawalAddress": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+  "userId": "test-user-123",
+  "category": "packages",
+  "orderDescription": "Package withdrawal test"
+}
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "withdrawal_id": "wd_1734567890123_abc123def",
+    "status": "pending",
+    "amount": 0.001,
+    "currency": "btc",
+    "withdrawal_address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+    "order_id": "ORDER-123",
+    "estimated_arrival": "2025-10-10T18:00:00.000Z",
+    "category": "packages"
+  },
+  "message": "Withdrawal created successfully"
+}
+```
+
+#### Create Matrix Withdrawal
+```http
+POST https://crypto-api-pi.vercel.app/api/withdrawals/create
+Content-Type: application/json
+
+{
+  "amount": "0.01",
+  "currency": "eth",
+  "withdrawalAddress": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
+  "userId": "test-user-456",
+  "category": "matrix",
+  "orderDescription": "Matrix investment withdrawal"
+}
+```
+
+#### Create Lottery Withdrawal
+```http
+POST https://crypto-api-pi.vercel.app/api/withdrawals/create
+Content-Type: application/json
+
+{
+  "amount": "10",
+  "currency": "usdt",
+  "withdrawalAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+  "userId": "test-user-789",
+  "category": "lottery",
+  "orderDescription": "Lottery winnings withdrawal"
+}
+```
+
+### Step 7: Verify Withdrawal Status
+
+#### Check Packages Withdrawal Status
+```http
+GET https://crypto-api-pi.vercel.app/api/withdrawals/wd_1734567890123_abc123def?category=packages
+```
+
+#### Check Matrix Withdrawal Status
+```http
+GET https://crypto-api-pi.vercel.app/api/withdrawals/YOUR_WITHDRAWAL_ID?category=matrix
+```
+
+#### Check Lottery Withdrawal Status
+```http
+GET https://crypto-api-pi.vercel.app/api/withdrawals/YOUR_WITHDRAWAL_ID?category=lottery
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "withdrawal_id": "wd_1734567890123_abc123def",
+    "user_id": "test-user-123",
+    "status": "pending",
+    "amount": 0.001,
+    "currency": "btc",
+    "withdrawal_address": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+    "tx_hash": null,
+    "fee": 0.00001,
+    "estimated_arrival": "2025-10-10T18:00:00.000Z",
+    "created_at": "2025-10-10T16:30:00.000Z",
+    "updated_at": "2025-10-10T16:30:00.000Z",
+    "order_id": "ORDER-123",
+    "category": "packages"
+  }
+}
+```
+
+### Step 8: Test User Withdrawal History
+
+#### Get User Withdrawal History (Packages)
+```http
+GET https://crypto-api-pi.vercel.app/api/users/test-user-123/withdrawals?category=packages&limit=10&offset=0
+```
+
+#### Get User Withdrawal Statistics (Matrix)
+```http
+GET https://crypto-api-pi.vercel.app/api/users/test-user-456/withdrawals/stats?category=matrix
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "test-user-456",
+    "category": "matrix",
+    "total_withdrawals": 1,
+    "completed_withdrawals": 0,
+    "completion_rate": "0.00",
+    "status_breakdown": {
+      "pending": {
+        "count": 1,
+        "total_amount": 0.01
+      }
+    }
+  },
+  "message": "Withdrawal statistics retrieved successfully"
+}
+```
+
+### Step 9: Test Withdrawal Status Refresh
+
+#### Refresh Withdrawal Status
+```http
+GET https://crypto-api-pi.vercel.app/api/withdrawals/wd_1734567890123_abc123def/refresh?category=packages
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "withdrawal_id": "wd_1734567890123_abc123def",
+    "status": "completed",
+    "updated": true
+  },
+  "message": "Withdrawal status updated"
+}
+```
+
+### Step 10: Test Withdrawal Error Scenarios
+
+#### Invalid Currency
+```http
+POST https://crypto-api-pi.vercel.app/api/withdrawals/create
+Content-Type: application/json
+
+{
+  "amount": "0.001",
+  "currency": "invalid",
+  "withdrawalAddress": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+  "userId": "test-user-123",
+  "category": "packages"
+}
+```
+
+**Expected Error:**
+```json
+{
+  "success": false,
+  "message": "Invalid currency. Must be a non-empty string.",
+  "timestamp": "2025-10-10T16:35:00.000Z"
+}
+```
+
+#### Insufficient Balance (when balance checking is implemented)
+```http
+POST https://crypto-api-pi.vercel.app/api/withdrawals/create
+Content-Type: application/json
+
+{
+  "amount": "1000",
+  "currency": "btc",
+  "withdrawalAddress": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
+  "userId": "test-user-123",
+  "category": "packages"
+}
+```
+
+**Expected Error:**
+```json
+{
+  "success": false,
+  "message": "Insufficient balance. Available: 0.005 BTC",
+  "timestamp": "2025-10-10T16:35:00.000Z"
+}
+```
+
+#### Invalid Withdrawal Address
+```http
+POST https://crypto-api-pi.vercel.app/api/withdrawals/create
+Content-Type: application/json
+
+{
+  "amount": "0.001",
+  "currency": "btc",
+  "withdrawalAddress": "invalid-address",
+  "userId": "test-user-123",
+  "category": "packages"
+}
+```
+
+**Expected Error:**
+```json
+{
+  "success": false,
+  "message": "Invalid withdrawal address for the specified currency",
+  "timestamp": "2025-10-10T16:35:00.000Z"
 }
 ```

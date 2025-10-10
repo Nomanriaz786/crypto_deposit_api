@@ -1,8 +1,31 @@
-const { paymentFirestoreService } = require('../services');
+const { createPaymentFirestoreService, firestoreService } = require('../services');
 const { successResponse, errorResponse } = require('../utils');
 const config = require('../config');
 
+// Helper function to determine category
+async function determineCategory(paymentId) {
+  const categories = ['packages', 'matrix', 'lottery'];
+
+  for (const category of categories) {
+    try {
+      const collectionName = config.getCollectionForCategory(category);
+
+      // Try to get the document from this collection
+      const payment = await firestoreService.getDocument(collectionName, paymentId);
+      if (payment) {
+        return category;
+      }
+    } catch (error) {
+      // Continue to next category if not found
+      continue;
+    }
+  }
+
+  return null; // Payment not found in any collection
+}
+
 class TestController {
+
   // Only available in sandbox mode
   async simulateWebhook(req, res, next) {
     try {
@@ -17,7 +40,19 @@ class TestController {
         return res.status(400).json(errorResponse('payment_id and payment_status are required', 400));
       }
 
-      // Find payment in Firestore
+      // Determine category by checking all collections
+      const category = await determineCategory(payment_id);
+      if (!category) {
+        console.error(`Payment not found in any collection: ${payment_id}`);
+        return res.status(404).json(errorResponse('Payment not found', 404));
+      }
+
+      console.log(`Payment ${payment_id} belongs to category: ${category}`);
+
+      // Create category-specific service
+      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
+
+      // Find payment in the appropriate collection
       const payment = await paymentFirestoreService.getPaymentById(payment_id);
 
       if (!payment) {
@@ -78,6 +113,7 @@ class TestController {
       res.json(successResponse(
         {
           payment_id: payment_id,
+          category: category,
           old_status: payment.status,
           new_status: payment_status,
           simulated_webhook_data: simulatedWebhookData,
@@ -105,6 +141,18 @@ class TestController {
         return res.status(400).json(errorResponse('payment_id is required', 400));
       }
 
+      // Determine category by checking all collections
+      const category = await determineCategory(payment_id);
+      if (!category) {
+        console.error(`Payment not found in any collection: ${payment_id}`);
+        return res.status(404).json(errorResponse('Payment not found', 404));
+      }
+
+      console.log(`Payment ${payment_id} belongs to category: ${category}`);
+
+      // Create category-specific service
+      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
+
       const payment = await paymentFirestoreService.getPaymentById(payment_id);
       if (!payment) {
         return res.status(404).json(errorResponse('Payment not found', 404));
@@ -116,6 +164,7 @@ class TestController {
       res.json(successResponse(
         { 
           payment_id, 
+          category: category,
           message: 'Payment lifecycle simulation started',
           estimated_duration: `${delay_seconds * 4} seconds`
         },
@@ -123,7 +172,7 @@ class TestController {
       ));
 
       // Simulate the payment lifecycle asynchronously
-      this.runPaymentLifecycleSimulation(payment_id, delay_seconds * 1000);
+      this.runPaymentLifecycleSimulation(payment_id, delay_seconds * 1000, category);
 
     } catch (error) {
       console.error('Payment flow simulation error:', error);
@@ -131,7 +180,10 @@ class TestController {
     }
   }
 
-  async runPaymentLifecycleSimulation(payment_id, delay_ms) {
+  async runPaymentLifecycleSimulation(payment_id, delay_ms, category) {
+    // Create category-specific service
+    const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
+    
     const statuses = ['confirming', 'confirmed', 'sending', 'finished'];
     
     for (const status of statuses) {
@@ -151,13 +203,13 @@ class TestController {
         }
 
         await paymentFirestoreService.updatePaymentStatus(payment_id, updateData);
-        console.log(`🧪 SANDBOX LIFECYCLE: Payment ${payment_id} -> ${status}`);
+        console.log(`🧪 SANDBOX LIFECYCLE: Payment ${payment_id} -> ${status} (Category: ${category})`);
       } catch (error) {
         console.error(`Error updating payment ${payment_id} to ${status}:`, error);
       }
     }
     
-    console.log(`🧪 SANDBOX LIFECYCLE: Payment ${payment_id} simulation completed`);
+    console.log(`🧪 SANDBOX LIFECYCLE: Payment ${payment_id} simulation completed (Category: ${category})`);
   }
 
   // Get sandbox testing information
