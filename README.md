@@ -171,14 +171,14 @@ Firestore Database
 ## 🎯 Payment Creation Example
 
 ```bash
-curl -X POST https://your-api.vercel.app/api/payments/create \
+curl -X POST https://crypto-api-pi.vercel.app/api/payments/create \
   -H "Content-Type: application/json" \
   -d '{
-    "amount": 100,
-    "payCurrency": "usdterc20",
-    "userId": "user_12345",
-    "orderDescription": "Digital Product Purchase"
-  }'
+      "amount": 10.00,
+      "payCurrency": "btc", 
+      "userId": "user123",
+      "category": "matrix"
+   }'
 ```
 
 **Response:**
