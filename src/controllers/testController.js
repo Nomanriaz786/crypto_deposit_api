@@ -2,7 +2,6 @@ const { createPaymentFirestoreService, firestoreService } = require('../services
 const { successResponse, errorResponse } = require('../utils');
 const config = require('../config');
 
-// Helper function to determine category
 async function determineCategory(paymentId) {
   const categories = ['packages', 'matrix', 'lottery'];
 

@@ -37,8 +37,21 @@ const webhookLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Strict rate limiting for withdrawal creation
+const withdrawalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 withdrawal creation requests per windowMs
+  message: {
+    success: false,
+    error: 'Too many withdrawal creation attempts, please try again later.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 module.exports = {
   generalLimiter,
   paymentLimiter,
-  webhookLimiter
+  webhookLimiter,
+  withdrawalLimiter
 };

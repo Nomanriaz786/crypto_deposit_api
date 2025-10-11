@@ -17,17 +17,20 @@ const config = {
       packages: {
         apiKey: process.env.NOWPAYMENTS_API_KEY_PACKAGES,
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_PACKAGES,
-        collection: 'payments'
+        collection: 'payments',
+        withdrawalCollection: 'withdrawals'
       },
       matrix: {
         apiKey: process.env.NOWPAYMENTS_API_KEY_MATRIX,
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_MATRIX,
-        collection: 'matrix_payments'
+        collection: 'matrix_payments',
+        withdrawalCollection: 'matrix_withdrawals'
       },
       lottery: {
         apiKey: process.env.NOWPAYMENTS_API_KEY_LOTTERY,
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_LOTTERY,
-        collection: 'lottery_payments'
+        collection: 'lottery_payments',
+        withdrawalCollection: 'lottery_withdrawals'
       }
     },
     // Legacy configuration for backward compatibility
@@ -122,4 +125,10 @@ config.getCategoryConfig = (category) => {
 config.getCollectionForCategory = (category) => {
   const categoryConfig = config.getCategoryConfig(category);
   return categoryConfig.collection;
+};
+
+// Helper function to get withdrawal collection name for category
+config.getWithdrawalCollectionForCategory = (category) => {
+  const categoryConfig = config.getCategoryConfig(category);
+  return categoryConfig.withdrawalCollection;
 };

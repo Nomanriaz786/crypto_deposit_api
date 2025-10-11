@@ -6,7 +6,7 @@ const router = express.Router();
 
 /**
  * @route   POST /api/webhook/ipn
- * @desc    Handle NOWPayments IPN (Instant Payment Notification) webhook
+ * @desc    Handle NOWPayments IPN (Instant Payment Notification) webhook for both payments and withdrawals
  * @access  Public (NOWPayments webhook)
  */
 router.post('/ipn',

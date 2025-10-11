@@ -189,6 +189,79 @@ class NOWPaymentsService {
     }
   }
 
+  async createWithdrawal(withdrawalData) {
+    try {
+      const payload = {
+        address: withdrawalData.address,
+        currency: withdrawalData.currency.toLowerCase(),
+        amount: parseFloat(withdrawalData.amount),
+        ipn_callback_url: withdrawalData.ipnCallbackUrl || `${config.baseUrl.replace(/\/$/, '')}/api/webhook/withdrawal/ipn`
+      };
+
+      // Add optional fields if provided
+      if (withdrawalData.extra_id) payload.extra_id = withdrawalData.extra_id;
+      if (withdrawalData.contact_email) payload.contact_email = withdrawalData.contact_email;
+
+      console.log('NOWPayments create withdrawal payload:', JSON.stringify(payload, null, 2));
+
+      const response = await this.client.post('/payout', payload);
+
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('NOWPayments create withdrawal error:', error);
+      throw error;
+    }
+  }
+
+  async getWithdrawalStatus(withdrawalId) {
+    try {
+      const response = await this.client.get(`/payout/${withdrawalId}`);
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getWithdrawalHistory(options = {}) {
+    try {
+      const params = {};
+      if (options.limit) params.limit = options.limit;
+      if (options.offset) params.offset = options.offset;
+      if (options.date_from) params.date_from = options.date_from;
+      if (options.date_to) params.date_to = options.date_to;
+
+      const response = await this.client.get('/payouts', { params });
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getBalance() {
+    try {
+      const response = await this.client.get('/balance');
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async validateWithdrawalAddress(currency, address) {
+    try {
+      const response = await this.client.post('/validate/address', {
+        currency: currency.toLowerCase(),
+        address: address
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Address validation error:', error);
+      return { valid: false, error: error.message };
+    }
+  }
+
   verifyIPNSignature(payload, receivedSignature, category = null) {
     try {
       // Use category-specific IPN secret if category provided, otherwise use instance IPN secret

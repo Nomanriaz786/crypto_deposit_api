@@ -158,7 +158,7 @@ class UtilityController {
           'GET /api/users/:userId/withdrawals/stats'
         ],
         webhooks: [
-          'POST /api/webhook/ipn'
+          'POST /api/webhook/ipn (handles both payments and withdrawals)'
         ],
         utilities: [
           'GET /api/health',

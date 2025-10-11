@@ -21,6 +21,7 @@ const userRoutes = require('./src/routes/users');
 const webhookRoutes = require('./src/routes/webhooks');
 const utilityRoutes = require('./src/routes');
 const testRoutes = require('./src/routes/test');
+const withdrawalRoutes = require('./src/routes/withdrawals');
 
 // Create Express application
 const app = express();
@@ -53,6 +54,7 @@ app.use('/api', generalLimiter);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/webhook', webhookRoutes);
+app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api', utilityRoutes);
 
 // Test routes (only in sandbox mode)

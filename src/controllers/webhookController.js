@@ -1,6 +1,7 @@
 const crypto = require('crypto');
-const { createNowPaymentsService, createPaymentFirestoreService, firestoreService } = require('../services');
+const { createNowPaymentsService, createPaymentFirestoreService, createWithdrawalFirestoreService, firestoreService } = require('../services');
 const { successResponse } = require('../utils');
+const config = require('../config');
 
 class WebhookController {
   async handleIPN(req, res, next) {
@@ -10,98 +11,17 @@ class WebhookController {
       
       console.log('IPN Webhook received:', JSON.stringify(webhookData, null, 2));
 
-      // Validate webhook data
-      if (!webhookData.payment_id) {
-        console.error('Missing payment_id in webhook data');
-        return res.status(400).json({ error: 'Missing payment_id' });
+      // Determine if this is a payment or withdrawal webhook
+      if (webhookData.payment_id) {
+        // This is a payment webhook
+        return await this.handlePaymentIPN(webhookData, receivedSignature, res);
+      } else if (webhookData.withdrawal_id) {
+        // This is a withdrawal webhook
+        return await this.handleWithdrawalIPN(webhookData, receivedSignature, res);
+      } else {
+        console.error('Unknown webhook type - missing payment_id or withdrawal_id');
+        return res.status(400).json({ error: 'Unknown webhook type' });
       }
-
-      // Determine category by checking all collections
-      const category = await this.determineCategory(webhookData.payment_id);
-      if (!category) {
-        console.error(`Payment not found in any collection: ${webhookData.payment_id}`);
-        return res.status(404).json({ error: 'Payment not found' });
-      }
-
-      console.log(`Payment ${webhookData.payment_id} belongs to category: ${category}`);
-
-      // Create category-specific services
-      const nowPaymentsService = createNowPaymentsService(category);
-      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
-
-      // Verify IPN signature using scenario-specific service
-      if (!nowPaymentsService.verifyIPNSignature(webhookData, receivedSignature)) {
-        console.error('Invalid IPN signature');
-        return res.status(401).json({ error: 'Invalid signature' });
-      }
-
-      // Increment webhook attempts counter
-      await paymentFirestoreService.incrementWebhookAttempts(webhookData.payment_id);
-
-      // Find payment in the appropriate collection
-      const payment = await paymentFirestoreService.getPaymentById(webhookData.payment_id);
-
-      console.log(
-        `Processing IPN for payment ${webhookData.payment_id}: ${payment.status} -> ${webhookData.payment_status}`
-      );
-
-      // Update payment with complete webhook data
-      const updateData = {
-        status: webhookData.payment_status,
-        updated_at: new Date(),
-        last_webhook_at: new Date()
-      };
-
-      // Add all NOWPayments webhook fields if present
-      if (webhookData.pay_amount) updateData.pay_amount = parseFloat(webhookData.pay_amount);
-      if (webhookData.actually_paid) updateData.actually_paid = parseFloat(webhookData.actually_paid);
-      if (webhookData.outcome_amount) updateData.outcome_amount = parseFloat(webhookData.outcome_amount);
-      if (webhookData.fee) updateData.fee = parseFloat(webhookData.fee);
-      if (webhookData.pay_currency) updateData.pay_currency = webhookData.pay_currency.toLowerCase();
-      if (webhookData.outcome_currency) updateData.outcome_currency = webhookData.outcome_currency.toLowerCase();
-      if (webhookData.payment_extra_id) updateData.payment_extra_id = webhookData.payment_extra_id;
-      if (webhookData.burning_percent) updateData.burning_percent = parseFloat(webhookData.burning_percent);
-      if (webhookData.type) updateData.type = webhookData.type;
-
-      // Track payment confirmation details
-      if (webhookData.payment_status === 'confirmed' || webhookData.payment_status === 'finished') {
-        if (webhookData.actually_paid) {
-          updateData.confirmed_amount = parseFloat(webhookData.actually_paid);
-        }
-        updateData.confirmed_at = new Date();
-      }
-
-      // Track payment completion details
-      if (webhookData.payment_status === 'finished') {
-        updateData.completed_at = new Date();
-        updateData.final_amount = parseFloat(webhookData.outcome_amount || webhookData.actually_paid || updateData.pay_amount);
-      }
-
-      // Track failure details
-      if (['failed', 'expired', 'refunded'].includes(webhookData.payment_status)) {
-        updateData.failed_at = new Date();
-        if (webhookData.payment_status === 'expired') {
-          updateData.expired_at = new Date();
-        }
-      }
-
-      // Update payment status
-      const updatedPayment = await paymentFirestoreService.updatePaymentStatus(
-        webhookData.payment_id,
-        updateData
-      );
-
-      // Log status change
-      this.logPaymentStatusChange(updatedPayment, webhookData.payment_status);
-
-      // Handle different payment statuses
-      await this.handlePaymentStatus(updatedPayment, webhookData);
-
-      // Always respond with 200 to acknowledge receipt
-      res.status(200).json(successResponse(
-        { payment_id: webhookData.payment_id, category: category },
-        'IPN processed successfully'
-      ));
 
     } catch (error) {
       console.error('IPN processing error:', error);
@@ -113,6 +33,101 @@ class WebhookController {
         'IPN received but processing failed'
       ));
     }
+  }
+
+  async handlePaymentIPN(webhookData, receivedSignature, res) {
+    // Validate webhook data
+    if (!webhookData.payment_id) {
+      console.error('Missing payment_id in webhook data');
+      return res.status(400).json({ error: 'Missing payment_id' });
+    }
+
+    // Determine category by checking all collections
+    const category = await this.determineCategory(webhookData.payment_id);
+    if (!category) {
+      console.error(`Payment not found in any collection: ${webhookData.payment_id}`);
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    console.log(`Payment ${webhookData.payment_id} belongs to category: ${category}`);
+
+    // Create category-specific services
+    const nowPaymentsService = createNowPaymentsService(category);
+    const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
+
+    // Verify IPN signature using scenario-specific service
+    if (!nowPaymentsService.verifyIPNSignature(webhookData, receivedSignature)) {
+      console.error('Invalid IPN signature');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    // Increment webhook attempts counter
+    await paymentFirestoreService.incrementWebhookAttempts(webhookData.payment_id);
+
+    // Find payment in the appropriate collection
+    const payment = await paymentFirestoreService.getPaymentById(webhookData.payment_id);
+
+    console.log(
+      `Processing IPN for payment ${webhookData.payment_id}: ${payment.status} -> ${webhookData.payment_status}`
+    );
+
+    // Update payment with complete webhook data
+    const updateData = {
+      status: webhookData.payment_status,
+      updated_at: new Date(),
+      last_webhook_at: new Date()
+    };
+
+    // Add all NOWPayments webhook fields if present
+    if (webhookData.pay_amount) updateData.pay_amount = parseFloat(webhookData.pay_amount);
+    if (webhookData.actually_paid) updateData.actually_paid = parseFloat(webhookData.actually_paid);
+    if (webhookData.outcome_amount) updateData.outcome_amount = parseFloat(webhookData.outcome_amount);
+    if (webhookData.fee) updateData.fee = parseFloat(webhookData.fee);
+    if (webhookData.pay_currency) updateData.pay_currency = webhookData.pay_currency.toLowerCase();
+    if (webhookData.outcome_currency) updateData.outcome_currency = webhookData.outcome_currency.toLowerCase();
+    if (webhookData.payment_extra_id) updateData.payment_extra_id = webhookData.payment_extra_id;
+    if (webhookData.burning_percent) updateData.burning_percent = parseFloat(webhookData.burning_percent);
+    if (webhookData.type) updateData.type = webhookData.type;
+
+    // Track payment confirmation details
+    if (webhookData.payment_status === 'confirmed' || webhookData.payment_status === 'finished') {
+      if (webhookData.actually_paid) {
+        updateData.confirmed_amount = parseFloat(webhookData.actually_paid);
+      }
+      updateData.confirmed_at = new Date();
+    }
+
+    // Track payment completion details
+    if (webhookData.payment_status === 'finished') {
+      updateData.completed_at = new Date();
+      updateData.final_amount = parseFloat(webhookData.outcome_amount || webhookData.actually_paid || updateData.pay_amount);
+    }
+
+    // Track failure details
+    if (['failed', 'expired', 'refunded'].includes(webhookData.payment_status)) {
+      updateData.failed_at = new Date();
+      if (webhookData.payment_status === 'expired') {
+        updateData.expired_at = new Date();
+      }
+    }
+
+    // Update payment status
+    const updatedPayment = await paymentFirestoreService.updatePaymentStatus(
+      webhookData.payment_id,
+      updateData
+    );
+
+    // Log status change
+    this.logPaymentStatusChange(updatedPayment, webhookData.payment_status);
+
+    // Handle different payment statuses
+    await this.handlePaymentStatus(updatedPayment, webhookData);
+
+    // Always respond with 200 to acknowledge receipt
+    res.status(200).json(successResponse(
+      { payment_id: webhookData.payment_id, category: category },
+      'Payment IPN processed successfully'
+    ));
   }
 
   logPaymentStatusChange(payment, newStatus) {
@@ -431,6 +446,110 @@ class WebhookController {
     }
     
     return null; // Payment not found in any collection
+  }
+
+  async handleWithdrawalIPN(webhookData, receivedSignature, res) {
+    // Validate webhook data
+    if (!webhookData.withdrawal_id) {
+      console.error('Missing withdrawal_id in webhook data');
+      return res.status(400).json({ error: 'Missing withdrawal_id' });
+    }
+
+    // Determine category by checking all withdrawal collections
+    const category = await this.determineWithdrawalCategory(webhookData.withdrawal_id);
+    if (!category) {
+      console.error(`Withdrawal not found in any collection: ${webhookData.withdrawal_id}`);
+      return res.status(404).json({ error: 'Withdrawal not found' });
+    }
+
+    console.log(`Withdrawal ${webhookData.withdrawal_id} belongs to category: ${category}`);
+
+    // Create category-specific services
+    const nowPaymentsService = createNowPaymentsService(category);
+    const withdrawalFirestoreService = createWithdrawalFirestoreService(config.getWithdrawalCollectionForCategory(category));
+
+    // Verify IPN signature using category-specific service
+    if (!nowPaymentsService.verifyIPNSignature(webhookData, receivedSignature)) {
+      console.error('Invalid withdrawal IPN signature');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    // Increment webhook attempts counter
+    await withdrawalFirestoreService.incrementWebhookAttempts(webhookData.withdrawal_id);
+
+    // Find withdrawal in the appropriate collection
+    const withdrawal = await withdrawalFirestoreService.getWithdrawalById(webhookData.withdrawal_id);
+
+    console.log(
+      `Processing withdrawal IPN for ${webhookData.withdrawal_id}: ${withdrawal.status} -> ${webhookData.status}`
+    );
+
+    // Update withdrawal with webhook data
+    const updateData = {
+      status: webhookData.status,
+      updated_at: new Date(),
+      last_webhook_at: new Date()
+    };
+
+    // Add status-specific fields
+    if (webhookData.tx_hash) updateData.tx_hash = webhookData.tx_hash;
+    if (webhookData.fee) updateData.fee = webhookData.fee;
+    if (webhookData.estimated_arrival) updateData.estimated_arrival = webhookData.estimated_arrival;
+
+    // Track status changes
+    if (webhookData.status === 'sending') {
+      updateData.sending_at = new Date();
+      console.log(`🚀 Withdrawal ${webhookData.withdrawal_id} started sending`);
+    }
+
+    if (webhookData.status === 'completed') {
+      updateData.completed_at = new Date();
+      console.log(`✅ Withdrawal ${webhookData.withdrawal_id} completed successfully`);
+
+      // TODO: Debit user balance after successful withdrawal
+      // await this.debitUserBalance(withdrawal.user_id, withdrawal.amount, withdrawal.currency, category);
+    }
+
+    if (webhookData.status === 'failed') {
+      updateData.failed_at = new Date();
+      console.log(`❌ Withdrawal ${webhookData.withdrawal_id} failed`);
+
+      // TODO: Unlock user balance on failed withdrawal
+      // await this.unlockUserBalance(withdrawal.user_id, withdrawal.amount, withdrawal.currency, category);
+    }
+
+    // Update withdrawal status
+    const updatedWithdrawal = await withdrawalFirestoreService.updateWithdrawalStatus(
+      webhookData.withdrawal_id,
+      updateData
+    );
+
+    // Send success response to NOWPayments
+    res.status(200).json(successResponse(
+      { withdrawal_id: webhookData.withdrawal_id, category: category },
+      'Withdrawal IPN processed successfully'
+    ));
+  }
+
+  async determineWithdrawalCategory(withdrawalId) {
+    const categories = ['packages', 'matrix', 'lottery'];
+
+    for (const category of categories) {
+      try {
+        const collectionName = config.getWithdrawalCollectionForCategory(category);
+
+        // Try to get the document from this collection
+        const withdrawal = await firestoreService.getDocument(collectionName, withdrawalId);
+        if (withdrawal) {
+          return category;
+        }
+      } catch (error) {
+        // Continue to next category if not found
+        continue;
+      }
+    }
+
+    return null; // Withdrawal not found in any collection
   }
 }
 

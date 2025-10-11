@@ -1,51 +1,5 @@
 ## Complete Testing Workflow
 
-### Troubleshooting Common Issues
-
-#### ✅ **Fixed: Internal Server Error in Simulation**
-**Problem:** Getting "Payment simulation failed" with 500 status code.
-
-**Root Cause:** The test controller was using the legacy Firestore service that only checked the default 'payments' collection, but payments are stored in category-specific collections (payments, matrix_payments, lottery_payments).
-
-**Solution:** Updated the test controller to:
-- Use category-specific Firestore services
-- Automatically determine payment category before simulation
-- Handle all three categories (packages, matrix, lottery)
-
-**Status:** ✅ **RESOLVED** - Simulation now works correctly and returns category information.
-
-#### ❌ "Payment simulation failed" Error (Different Issue)
-**Problem:** You're trying to simulate a webhook for a payment that doesn't exist in the database.
-
-**Solution:**
-1. First create a real payment using `POST /api/payments/create`
-2. Copy the `payment_id` from the response
-3. Use that real `payment_id` in your simulation requests
-4. **Never use the example payment_ids from this documentation directly!**
-
-**Example Error Response:**
-```json
-{
-  "success": false,
-  "message": "Payment simulation failed",
-  "timestamp": "2025-10-10T16:34:46.017Z"
-}
-```
-
-**Correct Flow:**
-```bash
-# 1. Create payment first
-POST /api/payments/create
-# Response contains: "payment_id": "5081583233"
-
-# 2. Use the real payment_id in simulation
-POST /api/test/webhook/simulate
-{
-  "payment_id": "5081583233",  // ← Real payment_id from step 1
-  "payment_status": "finished"
-}
-```
-
 ### Step 1: Create a Test Payment
 
 **⚠️ IMPORTANT: You must create a real payment first to get a valid payment_id for testing!**
