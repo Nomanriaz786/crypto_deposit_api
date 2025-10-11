@@ -137,17 +137,21 @@ config.getWithdrawalCollectionForCategory = (category) => {
 config.detectCategoryFromPackageNames = (requestData) => {
   // Define package names that map to the 'packages' category
   const packageCategoryNames = [
-    'Starter', 'Basic', 'Standard', 'Pro', 'Elite', 'Premium', 'Ultimate',
-    'starter', 'basic', 'standard', 'pro', 'elite', 'premium', 'ultimate'
+    'Starter Package',
+    'Basic Package',
+    'Standard Package',
+    'Pro Package',
+    'Elite Package',
+    'Premium Package',
+    'Ultimate Package'
   ];
 
   // Check if the category field contains a package name
   if (requestData.category && typeof requestData.category === 'string') {
-    if (packageCategoryNames.includes(requestData.category.toLowerCase())) {
+    if (packageCategoryNames.includes(requestData.category)) {
       return 'packages';
     }
   }
 
-  // Default to 'packages' if no specific category detected
-  return 'packages';
+  return null;
 };

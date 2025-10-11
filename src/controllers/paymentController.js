@@ -12,7 +12,7 @@ class PaymentController {
       let detectedCategory = category;
       let originalCategoryName = category;
       if (!detectedCategory) {
-        detectedCategory = config.detectCategoryFromPackageNames(req.body);
+        detectedCategory = config.detectCategoryFromPackageNames(req.body) || 'packages';
       } else {
         // If category is provided, check if it's a package name and map to packages
         const packageCheck = config.detectCategoryFromPackageNames({ category: detectedCategory });
@@ -20,6 +20,7 @@ class PaymentController {
           originalCategoryName = detectedCategory; // Keep original name for description
           detectedCategory = 'packages';
         }
+        // If not a package name, keep the original category (matrix, lottery, etc.)
       }
 
       // Validate category
