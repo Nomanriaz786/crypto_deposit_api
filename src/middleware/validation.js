@@ -5,7 +5,7 @@ const ALLOWED_CURRENCIES = ['usdtbsc'];
 
 // Allowed categories and package names that map to categories
 const ALLOWED_CATEGORIES = ['packages', 'matrix', 'lottery'];
-const PACKAGE_NAMES = ['Starter', 'Basic', 'Standard', 'Pro', 'Elite', 'Premium', 'Ultimate', 'starter', 'basic', 'standard', 'pro', 'elite', 'premium', 'ultimate'];
+const PACKAGE_NAMES = ['Starter Package', 'Basic Package', 'Standard Package', 'Pro Package', 'Elite Package', 'Premium Package', 'Ultimate Package'];
 const ALLOWED_CATEGORY_VALUES = [...ALLOWED_CATEGORIES, ...PACKAGE_NAMES];
 
 // Validation rules
@@ -27,7 +27,7 @@ const validationRules = {
     body('category')
       .optional()
       .isIn(ALLOWED_CATEGORY_VALUES)
-      .withMessage(`Category must be one of: ${ALLOWED_CATEGORIES.join(', ')} or a valid package name: ${PACKAGE_NAMES.slice(0, 7).join(', ')}`),
+      .withMessage(`Category must be one of: ${ALLOWED_CATEGORIES.join(', ')} or a valid package name: ${PACKAGE_NAMES.join(', ')}`),
     body('orderDescription')
       .optional()
       .isLength({ max: 500 })
