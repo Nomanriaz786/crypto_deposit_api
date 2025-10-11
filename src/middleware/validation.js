@@ -3,6 +3,11 @@ const { body, param, query, validationResult } = require('express-validator');
 // Allowed currencies - only USDT BEP-20
 const ALLOWED_CURRENCIES = ['usdtbsc'];
 
+// Allowed categories and package names that map to categories
+const ALLOWED_CATEGORIES = ['packages', 'matrix', 'lottery'];
+const PACKAGE_NAMES = ['Starter', 'Basic', 'Standard', 'Pro', 'Elite', 'Premium', 'Ultimate', 'starter', 'basic', 'standard', 'pro', 'elite', 'premium', 'ultimate'];
+const ALLOWED_CATEGORY_VALUES = [...ALLOWED_CATEGORIES, ...PACKAGE_NAMES];
+
 // Validation rules
 const validationRules = {
   createDeposit: [
@@ -21,8 +26,8 @@ const validationRules = {
       .withMessage('User ID must be between 1-100 characters'),
     body('category')
       .optional()
-      .isIn(['packages', 'matrix', 'lottery'])
-      .withMessage('Category must be one of: packages, matrix, lottery'),
+      .isIn(ALLOWED_CATEGORY_VALUES)
+      .withMessage(`Category must be one of: ${ALLOWED_CATEGORIES.join(', ')} or a valid package name: ${PACKAGE_NAMES.slice(0, 7).join(', ')}`),
     body('orderDescription')
       .optional()
       .isLength({ max: 500 })

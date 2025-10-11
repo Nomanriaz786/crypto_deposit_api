@@ -18,7 +18,7 @@ class PaymentFirestoreService {
         pay_amount: paymentData.pay_amount,
         status: paymentData.payment_status || 'waiting',
         order_id: paymentData.order_id || generateOrderId(paymentData.userId),
-        order_description: paymentData.order_description,
+        order_description: paymentData.orderDescription || paymentData.order_description,
         network: paymentData.network,
         metadata: paymentData.metadata || {},
         webhook_attempts: 0

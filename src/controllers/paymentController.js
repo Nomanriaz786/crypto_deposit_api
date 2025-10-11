@@ -6,11 +6,25 @@ const { isCurrencyAllowed, getCurrencyDetails } = require('../config/currencies'
 class PaymentController {
   async createDeposit(req, res, next) {
     try {
-      const { amount, payCurrency, userId, orderDescription, metadata, category = 'packages' } = req.body;
+      const { amount, payCurrency, userId, orderDescription, metadata, category } = req.body;
+
+      // Auto-detect category based on package names if not provided, or map package names to packages category
+      let detectedCategory = category;
+      let originalCategoryName = category;
+      if (!detectedCategory) {
+        detectedCategory = config.detectCategoryFromPackageNames(req.body);
+      } else {
+        // If category is provided, check if it's a package name and map to packages
+        const packageCheck = config.detectCategoryFromPackageNames({ category: detectedCategory });
+        if (packageCheck === 'packages') {
+          originalCategoryName = detectedCategory; // Keep original name for description
+          detectedCategory = 'packages';
+        }
+      }
 
       // Validate category
       const validCategories = ['packages', 'matrix', 'lottery'];
-      if (!validCategories.includes(category)) {
+      if (!validCategories.includes(detectedCategory)) {
         return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
       }
 
@@ -42,8 +56,8 @@ class PaymentController {
       const orderId = generateOrderId(userId);
 
       // Create category-specific services
-      const nowPaymentsService = createNowPaymentsService(category);
-      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
+      const nowPaymentsService = createNowPaymentsService(detectedCategory);
+      const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(detectedCategory));
 
       // Create payment with NOWPayments
       const nowPaymentData = await nowPaymentsService.createPayment({
@@ -51,7 +65,7 @@ class PaymentController {
         payCurrency: payCurrency.trim(),
         userId,
         orderId,
-        orderDescription: orderDescription || `Payment for user ${userId} - Category: ${category}`,
+        orderDescription: orderDescription || `Payment for user ${userId} - ${originalCategoryName || detectedCategory} package`,
       });
 
       // Save payment to Firestore
@@ -64,11 +78,11 @@ class PaymentController {
         pay_amount: nowPaymentData.data.pay_amount || nowPaymentData.data.amount,
         payment_status: nowPaymentData.data.payment_status,
         order_id: orderId,
-        order_description: orderDescription || `Payment for user ${userId} - Category: ${category}`,
+        orderDescription: orderDescription || `Payment for user ${userId} - ${originalCategoryName || detectedCategory} package`,
         network: nowPaymentData.data.network,
         metadata: {
           ...metadata,
-          category
+          category: detectedCategory
         }
       });
 
@@ -81,7 +95,7 @@ class PaymentController {
         price_currency: 'usd',
         payment_status: payment.status,
         order_id: payment.order_id,
-        category: category,
+        category: detectedCategory,
         created_at: payment.created_at
       }, 'Payment created successfully'));
 

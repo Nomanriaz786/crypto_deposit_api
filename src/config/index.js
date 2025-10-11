@@ -132,3 +132,22 @@ config.getWithdrawalCollectionForCategory = (category) => {
   const categoryConfig = config.getCategoryConfig(category);
   return categoryConfig.withdrawalCollection;
 };
+
+// Helper function to detect category based on package names for deposits
+config.detectCategoryFromPackageNames = (requestData) => {
+  // Define package names that map to the 'packages' category
+  const packageCategoryNames = [
+    'Starter', 'Basic', 'Standard', 'Pro', 'Elite', 'Premium', 'Ultimate',
+    'starter', 'basic', 'standard', 'pro', 'elite', 'premium', 'ultimate'
+  ];
+
+  // Check if the category field contains a package name
+  if (requestData.category && typeof requestData.category === 'string') {
+    if (packageCategoryNames.includes(requestData.category.toLowerCase())) {
+      return 'packages';
+    }
+  }
+
+  // Default to 'packages' if no specific category detected
+  return 'packages';
+};
