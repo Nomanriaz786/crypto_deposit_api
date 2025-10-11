@@ -53,21 +53,13 @@ class WithdrawalController {
 
       // Validate withdrawal address (if supported by NOWPayments)
       try {
-        const nowPaymentsService = createNowPaymentsService(category);
         const addressValidation = await nowPaymentsService.validateWithdrawalAddress(currency.trim(), withdrawalAddress);
         if (!addressValidation.valid) {
-          console.warn('Address validation failed, but proceeding for testing:', addressValidation);
-          // return res.status(400).json(errorResponse('Invalid withdrawal address for the specified currency'));
+          return res.status(400).json(errorResponse('Invalid withdrawal address for the specified currency'));
         }
       } catch (validationError) {
         console.warn('Address validation not available, proceeding without validation:', validationError.message);
       }
-
-      // Check user balance (this would need to be implemented based on your balance system)
-      // const userBalance = await this.checkUserBalance(userId, category, parsedAmount, currency);
-      // if (!userBalance.sufficient) {
-      //   return res.status(400).json(errorResponse(`Insufficient balance. Available: ${userBalance.available} ${currency}`));
-      // }
 
       // Create withdrawal with NOWPayments
       const nowWithdrawalData = await nowPaymentsService.createWithdrawal({

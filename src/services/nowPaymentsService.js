@@ -251,13 +251,34 @@ class NOWPaymentsService {
 
   async validateWithdrawalAddress(currency, address) {
     try {
-      const response = await this.client.post('/validate/address', {
+      const response = await this.client.post('/payout/validate-address', {
         currency: currency.toLowerCase(),
         address: address
       });
-      return response.data;
+
+      // NOWPayments returns "OK" as plain text for valid addresses
+      if (response.data === 'OK' || response.status === 200) {
+        return { valid: true, message: 'Address is valid' };
+      }
+
+      return { valid: false, message: 'Address validation failed' };
     } catch (error) {
       console.error('Address validation error:', error);
+
+      // Handle specific error responses
+      if (error.response) {
+        const { status, data } = error.response;
+        if (status === 400 && data && data.message) {
+          return { valid: false, message: data.message };
+        }
+      }
+
+      // If the endpoint doesn't exist (404), return valid to allow the withdrawal
+      if (error.statusCode === 404 || error.code === 404) {
+        console.warn('Address validation endpoint not available, allowing withdrawal to proceed');
+        return { valid: true, message: 'Address validation not available' };
+      }
+
       return { valid: false, error: error.message };
     }
   }
