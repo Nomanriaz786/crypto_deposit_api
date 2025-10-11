@@ -67,11 +67,11 @@ class UtilityController {
     try {
       const currencies = await nowPaymentsService.getAvailableCurrencies();
       
-      // Filter to show only USDT BSC (BEP-20) and USDT ERC-20
-      const targetCurrencies = ['usdtbsc', 'usdterc20'];
+      // Only allow USDT BEP-20 (Binance Smart Chain)
+      const allowedCurrencies = ['usdtbsc'];
       
       const filteredCurrencies = currencies.currencies.filter(currency => {
-        return targetCurrencies.includes(currency.currency.toLowerCase());
+        return allowedCurrencies.includes(currency.currency.toLowerCase());
       });
 
       res.json(successResponse(
@@ -149,6 +149,13 @@ class UtilityController {
           'GET /api/payments/:paymentId/refresh',
           'GET /api/users/:userId/payments',
           'GET /api/users/:userId/payments/stats'
+        ],
+        withdrawals: [
+          'POST /api/withdrawals/create',
+          'GET /api/withdrawals/:withdrawalId',
+          'GET /api/withdrawals/:withdrawalId/refresh',
+          'GET /api/users/:userId/withdrawals',
+          'GET /api/users/:userId/withdrawals/stats'
         ],
         webhooks: [
           'POST /api/webhook/ipn'

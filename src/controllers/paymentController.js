@@ -1,6 +1,7 @@
 const { createNowPaymentsService, createPaymentFirestoreService } = require('../services');
 const { successResponse, errorResponse, generateOrderId } = require('../utils');
 const config = require('../config');
+const { isCurrencyAllowed, getCurrencyDetails } = require('../config/currencies');
 
 class PaymentController {
   async createDeposit(req, res, next) {
@@ -22,6 +23,20 @@ class PaymentController {
       // Validate payCurrency
       if (!payCurrency || typeof payCurrency !== 'string' || payCurrency.trim() === '') {
         return res.status(400).json(errorResponse('Invalid pay currency. Must be a non-empty string.'));
+      }
+
+      // Check if currency is allowed
+      if (!isCurrencyAllowed(payCurrency)) {
+        const currencyDetails = getCurrencyDetails(payCurrency);
+        return res.status(400).json(errorResponse(
+          `Currency '${payCurrency}' is not supported. Only USDT BEP-20 (usdtbsc) is accepted for deposits.`,
+          400,
+          {
+            provided_currency: payCurrency,
+            allowed_currencies: ['usdtbsc'],
+            currency_name: 'USDT BEP-20 (Binance Smart Chain)'
+          }
+        ));
       }
 
       const orderId = generateOrderId(userId);
