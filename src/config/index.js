@@ -17,20 +17,34 @@ const config = {
       packages: {
         apiKey: process.env.NOWPAYMENTS_API_KEY_PACKAGES,
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_PACKAGES,
+        authEmail: process.env.NOWPAYMENTS_AUTH_EMAIL_PACKAGES,
+        authPassword: process.env.NOWPAYMENTS_AUTH_PASSWORD_PACKAGES,
         collection: 'payments',
         withdrawalCollection: 'withdrawals'
       },
       matrix: {
         apiKey: process.env.NOWPAYMENTS_API_KEY_MATRIX,
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_MATRIX,
+        authEmail: process.env.NOWPAYMENTS_AUTH_EMAIL_MATRIX,
+        authPassword: process.env.NOWPAYMENTS_AUTH_PASSWORD_MATRIX,
         collection: 'matrix_payments',
         withdrawalCollection: 'matrix_withdrawals'
       },
       lottery: {
         apiKey: process.env.NOWPAYMENTS_API_KEY_LOTTERY,
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_LOTTERY,
+        authEmail: process.env.NOWPAYMENTS_AUTH_EMAIL_LOTTERY,
+        authPassword: process.env.NOWPAYMENTS_AUTH_PASSWORD_LOTTERY,
         collection: 'lottery_payments',
         withdrawalCollection: 'lottery_withdrawals'
+      },
+      passive_income: {
+        apiKey: process.env.NOWPAYMENTS_API_KEY_PASSIVE_INCOME,
+        ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_PASSIVE_INCOME,
+        authEmail: process.env.NOWPAYMENTS_AUTH_EMAIL_PASSIVE_INCOME,
+        authPassword: process.env.NOWPAYMENTS_AUTH_PASSWORD_PASSIVE_INCOME,
+        collection: 'passive_income_payments',
+        withdrawalCollection: 'passive_income_withdrawals'
       }
     },
     // Legacy configuration for backward compatibility
@@ -79,10 +93,20 @@ if (process.env.NOWPAYMENTS_SANDBOX === 'true') {
   requiredEnvVars.push(
     'NOWPAYMENTS_API_KEY_PACKAGES',
     'NOWPAYMENTS_IPN_SECRET_PACKAGES',
+    'NOWPAYMENTS_AUTH_EMAIL_PACKAGES',
+    'NOWPAYMENTS_AUTH_PASSWORD_PACKAGES',
     'NOWPAYMENTS_API_KEY_MATRIX',
     'NOWPAYMENTS_IPN_SECRET_MATRIX',
+    'NOWPAYMENTS_AUTH_EMAIL_MATRIX',
+    'NOWPAYMENTS_AUTH_PASSWORD_MATRIX',
     'NOWPAYMENTS_API_KEY_LOTTERY',
-    'NOWPAYMENTS_IPN_SECRET_LOTTERY'
+    'NOWPAYMENTS_IPN_SECRET_LOTTERY',
+    'NOWPAYMENTS_AUTH_EMAIL_LOTTERY',
+    'NOWPAYMENTS_AUTH_PASSWORD_LOTTERY',
+    'NOWPAYMENTS_API_KEY_PASSIVE_INCOME',
+    'NOWPAYMENTS_IPN_SECRET_PASSIVE_INCOME',
+    'NOWPAYMENTS_AUTH_EMAIL_PASSIVE_INCOME',
+    'NOWPAYMENTS_AUTH_PASSWORD_PASSIVE_INCOME'
   );
 }
 

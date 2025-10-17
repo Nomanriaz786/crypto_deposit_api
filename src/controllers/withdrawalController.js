@@ -1,5 +1,5 @@
 const { createNowPaymentsService, createWithdrawalFirestoreService } = require('../services');
-const { successResponse, errorResponse, generateOrderId } = require('../utils');
+const { successResponse, errorResponse, generateOrderId, generatePayoutExtraId } = require('../utils');
 const config = require('../config');
 const { isCurrencyAllowed, getCurrencyDetails } = require('../config/currencies');
 
@@ -9,9 +9,9 @@ class WithdrawalController {
       const { amount, currency, withdrawalAddress, userId, orderDescription, metadata, category = 'packages' } = req.body;
 
       // Validate category
-      const validCategories = ['packages', 'matrix', 'lottery'];
+      const validCategories = ['packages', 'matrix', 'lottery', 'passive_income'];
       if (!validCategories.includes(category)) {
-        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery, passive_income'));
       }
 
       // Validate required fields
@@ -46,19 +46,34 @@ class WithdrawalController {
       // Generate unique withdrawal ID
       const withdrawalId = `wd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const orderId = generateOrderId(userId);
+      const payoutExtraId = generatePayoutExtraId(); // Short extra ID for NOWPayments
 
       // Create category-specific services
       const nowPaymentsService = createNowPaymentsService(category);
       const withdrawalFirestoreService = createWithdrawalFirestoreService(config.getWithdrawalCollectionForCategory(category));
 
-      // Validate withdrawal address (if supported by NOWPayments)
+      // Check account balance before attempting withdrawal
+      console.log(`🔍 Checking balance for category: ${category}`);
       try {
-        const addressValidation = await nowPaymentsService.validateWithdrawalAddress(currency.trim(), withdrawalAddress);
-        if (!addressValidation.valid) {
-          return res.status(400).json(errorResponse('Invalid withdrawal address for the specified currency'));
+        const balanceData = await nowPaymentsService.getBalance();
+        console.log('📊 Account balance:', balanceData);
+        
+        const currencyBalance = balanceData[currency.toLowerCase()] || 0;
+        if (currencyBalance < parsedAmount) {
+          return res.status(400).json(errorResponse(
+            `Insufficient balance in NOWPayments ${category} account. Requested: ${parsedAmount} ${currency.toUpperCase()}, Available: ${currencyBalance} ${currency.toUpperCase()}`,
+            400,
+            {
+              requested_amount: parsedAmount,
+              available_balance: currencyBalance,
+              currency: currency.toUpperCase(),
+              category: category
+            }
+          ));
         }
-      } catch (validationError) {
-        console.warn('Address validation not available, proceeding without validation:', validationError.message);
+      } catch (balanceError) {
+        console.warn('⚠️ Could not check balance, proceeding with withdrawal attempt:', balanceError.message);
+        // Continue with withdrawal attempt if balance check fails
       }
 
       // Create withdrawal with NOWPayments
@@ -66,7 +81,7 @@ class WithdrawalController {
         address: withdrawalAddress,
         currency: currency.trim(),
         amount: parsedAmount,
-        extra_id: orderId, // Use order ID as extra ID for tracking
+        // Note: extra_id removed as NOWPayments rejects it for some currencies/accounts
         contact_email: metadata?.email // Optional contact email
       });
 
@@ -87,6 +102,7 @@ class WithdrawalController {
           ...metadata,
           category,
           nowpayments_id: nowWithdrawalData.data.id
+          // Removed payout_extra_id since we're not using extra_id for payouts
         }
       });
 
@@ -113,9 +129,9 @@ class WithdrawalController {
       const { category = 'packages' } = req.query;
 
       // Validate category
-      const validCategories = ['packages', 'matrix', 'lottery'];
+      const validCategories = ['packages', 'matrix', 'lottery', 'passive_income'];
       if (!validCategories.includes(category)) {
-        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery, passive_income'));
       }
 
       const withdrawalFirestoreService = createWithdrawalFirestoreService(config.getWithdrawalCollectionForCategory(category));
@@ -148,9 +164,9 @@ class WithdrawalController {
       const { status, limit = 10, offset = 0, category = 'packages' } = req.query;
 
       // Validate category
-      const validCategories = ['packages', 'matrix', 'lottery'];
+      const validCategories = ['packages', 'matrix', 'lottery', 'passive_income'];
       if (!validCategories.includes(category)) {
-        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery, passive_income'));
       }
 
       const withdrawalFirestoreService = createWithdrawalFirestoreService(config.getWithdrawalCollectionForCategory(category));
@@ -177,9 +193,9 @@ class WithdrawalController {
       const { category = 'packages' } = req.query;
 
       // Validate category
-      const validCategories = ['packages', 'matrix', 'lottery'];
+      const validCategories = ['packages', 'matrix', 'lottery', 'passive_income'];
       if (!validCategories.includes(category)) {
-        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery, passive_income'));
       }
 
       const withdrawalFirestoreService = createWithdrawalFirestoreService(config.getWithdrawalCollectionForCategory(category));
@@ -202,9 +218,9 @@ class WithdrawalController {
       const { category = 'packages' } = req.query;
 
       // Validate category
-      const validCategories = ['packages', 'matrix', 'lottery'];
+      const validCategories = ['packages', 'matrix', 'lottery', 'passive_income'];
       if (!validCategories.includes(category)) {
-        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery'));
+        return res.status(400).json(errorResponse('Invalid category. Must be one of: packages, matrix, lottery, passive_income'));
       }
 
       const withdrawalFirestoreService = createWithdrawalFirestoreService(config.getWithdrawalCollectionForCategory(category));

@@ -7,6 +7,13 @@ const generateOrderId = (userId) => {
   return `${userId}_${timestamp}_${randomString}`;
 };
 
+// Generate short payout extra ID (for NOWPayments withdrawals)
+const generatePayoutExtraId = () => {
+  const timestamp = Date.now();
+  const randomPart = crypto.randomBytes(2).toString('hex');
+  return `p${timestamp.toString().slice(-6)}${randomPart}`;
+};
+
 // Format response for consistent API responses
 const formatResponse = (success, data, message = null, pagination = null) => {
   const response = {
@@ -118,6 +125,7 @@ const retryWithBackoff = async (fn, maxRetries = 3, baseDelay = 1000) => {
 
 module.exports = {
   generateOrderId,
+  generatePayoutExtraId,
   formatResponse,
   successResponse,
   errorResponse,
