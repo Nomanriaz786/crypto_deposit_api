@@ -1,5 +1,57 @@
 ## Complete Testing Workflow
 
+### Prerequisites: Verify Hosted API
+
+Before running any tests, verify the hosted API is accessible:
+
+```bash
+# Test API health endpoint
+curl https://crypto-api-pi.vercel.app/api/test/health
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "message": "API is healthy",
+  "timestamp": "2025-10-17T12:00:00.000Z"
+}
+```
+
+**Note:** All testing commands in this document use the hosted API endpoints. Clients should test directly against the production deployment at `https://crypto-api-pi.vercel.app`.
+
+### Environment Setup
+
+Make sure you have the following environment variables set in your `.env` file:
+
+```env
+# Firebase/Firestore
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_PRIVATE_KEY=your-private-key
+FIREBASE_CLIENT_EMAIL=your-client-email
+
+# NOWPayments API Keys (one set per category)
+PACKAGES_API_KEY=your-packages-api-key
+PACKAGES_EMAIL=your-packages-email
+PACKAGES_PASSWORD=your-packages-password
+PACKAGES_IPN_SECRET=your-packages-ipn-secret
+
+MATRIX_API_KEY=your-matrix-api-key
+MATRIX_EMAIL=your-matrix-email
+MATRIX_PASSWORD=your-matrix-password
+MATRIX_IPN_SECRET=your-matrix-ipn-secret
+
+LOTTERY_API_KEY=your-lottery-api-key
+LOTTERY_EMAIL=your-lottery-email
+LOTTERY_PASSWORD=your-lottery-password
+LOTTERY_IPN_SECRET=your-lottery-ipn-secret
+
+PASSIVE_INCOME_API_KEY=your-passive-income-api-key
+PASSIVE_INCOME_EMAIL=your-passive-income-email
+PASSIVE_INCOME_PASSWORD=your-passive-income-password
+PASSIVE_INCOME_IPN_SECRET=your-passive-income-ipn-secret
+```
+
 ### Step 1: Create a Test Payment
 
 **⚠️ IMPORTANT: You must create a real payment first to get a valid payment_id for testing!**
@@ -62,6 +114,19 @@ Content-Type: application/json
 }
 ```
 
+#### Create Passive Income Payment
+```http
+POST https://crypto-api-pi.vercel.app/api/payments/create
+Content-Type: application/json
+
+{
+  "amount": "50",
+  "payCurrency": "usdtbsc",
+  "userId": "test-user-999",
+  "category": "passive_income"
+}
+```
+
 ### Step 2: Verify Payment in Database
 
 #### Check Packages Payment
@@ -77,6 +142,11 @@ GET https://crypto-api-pi.vercel.app/api/payments/87654321?category=matrix
 #### Check Lottery Payment
 ```http
 GET https://crypto-api-pi.vercel.app/api/payments/11223344?category=lottery
+```
+
+#### Check Passive Income Payment
+```http
+GET https://crypto-api-pi.vercel.app/api/payments/44556677?category=passive_income
 ```
 
 ### Step 3: Test Different Payment Scenarios
@@ -123,7 +193,7 @@ Content-Type: application/json
 }
 ```
 
-#### Partial Payment Test (Lottery)
+#### Successful Payment Test (Lottery)
 
 ```http
 POST https://crypto-api-pi.vercel.app/api/test/webhook/simulate
@@ -131,9 +201,25 @@ Content-Type: application/json
 
 {
   "payment_id": "YOUR_LOTTERY_PAYMENT_ID",  // ← Replace with real payment_id from Step 1!
-  "payment_status": "partially_paid",
-  "actually_paid": "2.5",
-  "outcome_amount": "2.50"
+  "payment_status": "finished",
+  "actually_paid": "5",
+  "outcome_amount": "5.00",
+  "fee": "0.1"
+}
+```
+
+#### Successful Payment Test (Passive Income)
+
+```http
+POST https://crypto-api-pi.vercel.app/api/test/webhook/simulate
+Content-Type: application/json
+
+{
+  "payment_id": "YOUR_PASSIVE_INCOME_PAYMENT_ID",  // ← Replace with real payment_id from Step 1!
+  "payment_status": "finished",
+  "actually_paid": "50",
+  "outcome_amount": "50.00",
+  "fee": "1.0"
 }
 ```
 
@@ -145,6 +231,18 @@ Content-Type: application/json
 
 {
   "payment_id": "YOUR_MATRIX_PAYMENT_ID",  // ← Replace with real payment_id from Step 1!
+  "payment_status": "failed"
+}
+```
+
+#### Failed Payment Test (Passive Income)
+
+```http
+POST https://crypto-api-pi.vercel.app/api/test/webhook/simulate
+Content-Type: application/json
+
+{
+  "payment_id": "YOUR_PASSIVE_INCOME_PAYMENT_ID",  // ← Replace with real payment_id from Step 1!
   "payment_status": "failed"
 }
 ```
@@ -185,6 +283,28 @@ Content-Type: application/json
 }
 ```
 
+#### Lottery Category Lifecycle
+```http
+POST https://crypto-api-pi.vercel.app/api/test/payment/simulate-flow
+Content-Type: application/json
+
+{
+  "payment_id": "YOUR_LOTTERY_PAYMENT_ID",  // ← Replace with real payment_id!
+  "delay_seconds": 1
+}
+```
+
+#### Passive Income Category Lifecycle
+```http
+POST https://crypto-api-pi.vercel.app/api/test/payment/simulate-flow
+Content-Type: application/json
+
+{
+  "payment_id": "YOUR_PASSIVE_INCOME_PAYMENT_ID",  // ← Replace with real payment_id!
+  "delay_seconds": 4
+}
+```
+
 ### Step 5: Verify Final Payment Status
 
 #### Check Packages Payment Status
@@ -200,6 +320,11 @@ GET https://crypto-api-pi.vercel.app/api/payments/YOUR_MATRIX_PAYMENT_ID?categor
 #### Check Lottery Payment Status
 ```http
 GET https://crypto-api-pi.vercel.app/api/payments/YOUR_LOTTERY_PAYMENT_ID?category=lottery
+```
+
+#### Check Passive Income Payment Status
+```http
+GET https://crypto-api-pi.vercel.app/api/payments/YOUR_PASSIVE_INCOME_PAYMENT_ID?category=passive_income
 ```
 
 **Expected Response:**
@@ -276,12 +401,27 @@ POST https://crypto-api-pi.vercel.app/api/withdrawals/create
 Content-Type: application/json
 
 {
-  "amount": "10",
-  "currency": "usdt",
-  "withdrawalAddress": "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
+  "amount": "0.01",
+  "currency": "usdtbsc",
+  "withdrawalAddress": "0xc4087e5f6e89b8b11d48d7dfc17efddd359c1f41",
   "userId": "test-user-789",
   "category": "lottery",
   "orderDescription": "Lottery winnings withdrawal"
+}
+```
+
+#### Create Passive Income Withdrawal
+```http
+POST https://crypto-api-pi.vercel.app/api/withdrawals/create
+Content-Type: application/json
+
+{
+  "amount": "1.0",
+  "currency": "usdtbsc",
+  "withdrawalAddress": "0x8ba1f109551bD432803012645261768374161",
+  "userId": "test-user-999",
+  "category": "passive_income",
+  "orderDescription": "Passive income withdrawal"
 }
 ```
 
@@ -300,6 +440,11 @@ GET https://crypto-api-pi.vercel.app/api/withdrawals/YOUR_WITHDRAWAL_ID?category
 #### Check Lottery Withdrawal Status
 ```http
 GET https://crypto-api-pi.vercel.app/api/withdrawals/YOUR_WITHDRAWAL_ID?category=lottery
+```
+
+#### Check Passive Income Withdrawal Status
+```http
+GET https://crypto-api-pi.vercel.app/api/withdrawals/YOUR_WITHDRAWAL_ID?category=passive_income
 ```
 
 **Expected Response:**
@@ -334,6 +479,16 @@ GET https://crypto-api-pi.vercel.app/api/users/test-user-123/withdrawals?categor
 #### Get User Withdrawal Statistics (Matrix)
 ```http
 GET https://crypto-api-pi.vercel.app/api/users/test-user-456/withdrawals/stats?category=matrix
+```
+
+#### Get User Withdrawal History (Lottery)
+```http
+GET https://crypto-api-pi.vercel.app/api/users/test-user-789/withdrawals?category=lottery&limit=10&offset=0
+```
+
+#### Get User Withdrawal Statistics (Passive Income)
+```http
+GET https://crypto-api-pi.vercel.app/api/users/test-user-999/withdrawals/stats?category=passive_income
 ```
 
 **Expected Response:**
@@ -377,7 +532,57 @@ GET https://crypto-api-pi.vercel.app/api/withdrawals/wd_1734567890123_abc123def/
 }
 ```
 
-### Step 10: Test Withdrawal Error Scenarios
+### Step 10: Test Balance Checking
+
+#### Check NOWPayments Account Balance (Packages)
+```http
+GET https://crypto-api-pi.vercel.app/api/withdrawals/balance?category=packages&currency=btc
+```
+
+#### Check NOWPayments Account Balance (Matrix)
+```http
+GET https://crypto-api-pi.vercel.app/api/withdrawals/balance?category=matrix&currency=eth
+```
+
+#### Check NOWPayments Account Balance (Lottery)
+```http
+GET https://crypto-api-pi.vercel.app/api/withdrawals/balance?category=lottery&currency=usdtbsc
+```
+
+#### Check NOWPayments Account Balance (Passive Income)
+```http
+GET https://crypto-api-pi.vercel.app/api/withdrawals/balance?category=passive_income&currency=usdtbsc
+```
+
+**Expected Response (when balance is 0):**
+```json
+{
+  "success": true,
+  "data": {
+    "category": "lottery",
+    "currency": "usdtbsc",
+    "balance": 0,
+    "available_for_withdrawal": 0
+  },
+  "message": "Balance retrieved successfully"
+}
+```
+
+**Expected Response (when balance exists):**
+```json
+{
+  "success": true,
+  "data": {
+    "category": "packages",
+    "currency": "btc",
+    "balance": 0.005,
+    "available_for_withdrawal": 0.005
+  },
+  "message": "Balance retrieved successfully"
+}
+```
+
+### Step 11: Test Withdrawal Error Scenarios
 
 #### Invalid Currency
 ```http
@@ -402,17 +607,17 @@ Content-Type: application/json
 }
 ```
 
-#### Insufficient Balance (when balance checking is implemented)
+#### Insufficient Balance (NOWPayments Account)
 ```http
 POST https://crypto-api-pi.vercel.app/api/withdrawals/create
 Content-Type: application/json
 
 {
   "amount": "1000",
-  "currency": "btc",
-  "withdrawalAddress": "bc1qxy2kgdygjrsqtzq2n0yrf2493p83kkfjhx0wlh",
-  "userId": "test-user-123",
-  "category": "packages"
+  "currency": "usdtbsc",
+  "withdrawalAddress": "0xc4087e5f6e89b8b11d48d7dfc17efddd359c1f41",
+  "userId": "test-user-789",
+  "category": "lottery"
 }
 ```
 
@@ -420,8 +625,8 @@ Content-Type: application/json
 ```json
 {
   "success": false,
-  "message": "Insufficient balance. Available: 0.005 BTC",
-  "timestamp": "2025-10-10T16:35:00.000Z"
+  "message": "Insufficient balance in NOWPayments lottery account. Requested: 1000 USDTBSC, Available: 0 USDTBSC",
+  "timestamp": "2025-10-17T12:00:00.000Z"
 }
 ```
 
@@ -447,3 +652,206 @@ Content-Type: application/json
   "timestamp": "2025-10-10T16:35:00.000Z"
 }
 ```
+
+#### Invalid Category
+```http
+POST https://crypto-api-pi.vercel.app/api/withdrawals/create
+Content-Type: application/json
+
+{
+  "amount": "0.01",
+  "currency": "usdtbsc",
+  "withdrawalAddress": "0xc4087e5f6e89b8b11d48d7dfc17efddd359c1f41",
+  "userId": "test-user-123",
+  "category": "invalid_category"
+}
+```
+
+**Expected Error:**
+```json
+{
+  "success": false,
+  "message": "Invalid category. Must be one of: packages, matrix, lottery, passive_income",
+  "timestamp": "2025-10-10T16:35:00.000Z"
+}
+```
+
+#### Missing Required Fields
+```http
+POST https://crypto-api-pi.vercel.app/api/withdrawals/create
+Content-Type: application/json
+
+{
+  "amount": "0.01",
+  "currency": "usdtbsc",
+  "userId": "test-user-123",
+  "category": "lottery"
+}
+```
+
+**Expected Error:**
+```json
+{
+  "success": false,
+  "message": "withdrawalAddress is required",
+  "timestamp": "2025-10-10T16:35:00.000Z"
+}
+```
+
+## Client Integration Guide
+
+### Production Deployment
+
+1. **Deploy to Vercel:**
+   ```bash
+   vercel --prod
+   ```
+
+2. **Update Environment Variables in Vercel:**
+   - Go to your Vercel dashboard
+   - Navigate to your project settings
+   - Add all environment variables listed in the Environment Setup section
+
+3. **Configure NOWPayments Webhooks:**
+   - For each category, set the webhook URL to: `https://your-vercel-domain.vercel.app/api/webhook/ipn`
+   - Use the corresponding IPN secret for each category
+
+### Client Integration Examples
+
+#### JavaScript/Node.js Client
+
+```javascript
+// Payment Creation
+const createPayment = async (amount, currency, userId, category) => {
+  const response = await fetch('https://your-domain.vercel.app/api/payments/create', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      amount: amount.toString(),
+      payCurrency: currency,
+      userId,
+      category
+    })
+  });
+  
+  const result = await response.json();
+  return result;
+};
+
+// Withdrawal Creation
+const createWithdrawal = async (amount, currency, address, userId, category, description) => {
+  const response = await fetch('https://your-domain.vercel.app/api/withdrawals/create', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      amount: amount.toString(),
+      currency,
+      withdrawalAddress: address,
+      userId,
+      category,
+      orderDescription: description
+    })
+  });
+  
+  const result = await response.json();
+  return result;
+};
+
+// Check Balance
+const checkBalance = async (category, currency) => {
+  const response = await fetch(`https://your-domain.vercel.app/api/withdrawals/balance?category=${category}&currency=${currency}`);
+  const result = await response.json();
+  return result;
+};
+
+// Usage Examples
+const payment = await createPayment(10, 'btc', 'user123', 'packages');
+const withdrawal = await createWithdrawal(0.01, 'usdtbsc', '0x...', 'user123', 'lottery', 'Test withdrawal');
+const balance = await checkBalance('lottery', 'usdtbsc');
+```
+
+#### cURL Examples for Client Integration
+
+```bash
+# Create Payment
+curl -X POST https://your-domain.vercel.app/api/payments/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": "10",
+    "payCurrency": "btc",
+    "userId": "user123",
+    "category": "packages"
+  }'
+
+# Create Withdrawal
+curl -X POST https://your-domain.vercel.app/api/withdrawals/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": "0.01",
+    "currency": "usdtbsc",
+    "withdrawalAddress": "0xc4087e5f6e89b8b11d48d7dfc17efddd359c1f41",
+    "userId": "user123",
+    "category": "lottery",
+    "orderDescription": "Lottery withdrawal"
+  }'
+
+# Check Balance
+curl "https://your-domain.vercel.app/api/withdrawals/balance?category=lottery&currency=usdtbsc"
+
+# Check Payment Status
+curl "https://your-domain.vercel.app/api/payments/5081583233?category=packages"
+
+# Check Withdrawal Status
+curl "https://your-domain.vercel.app/api/withdrawals/wd_1734567890123_abc123def?category=packages"
+```
+
+### Error Handling
+
+Always check the `success` field in responses:
+
+```javascript
+const handleApiResponse = (response) => {
+  if (response.success) {
+    // Success - handle data
+    console.log('Success:', response.data);
+  } else {
+    // Error - handle error message
+    console.error('Error:', response.message);
+    // Show user-friendly error message
+    alert(response.message);
+  }
+};
+```
+
+### Webhook Integration
+
+Set up webhook endpoints in your client application to receive payment notifications:
+
+```javascript
+// Webhook endpoint to receive payment updates
+app.post('/webhook/payment-update', (req, res) => {
+  const { payment_id, payment_status, category } = req.body;
+  
+  // Update your database with payment status
+  updatePaymentStatus(payment_id, payment_status, category);
+  
+  res.json({ received: true });
+});
+```
+
+### Testing Checklist
+
+- [ ] Server starts without errors
+- [ ] All environment variables are set
+- [ ] Payment creation works for all categories
+- [ ] Webhook simulation works
+- [ ] Balance checking works
+- [ ] Withdrawal creation works (when balance exists)
+- [ ] Error handling works correctly
+- [ ] Production deployment successful
+- [ ] NOWPayments webhooks configured
+- [ ] Client integration tested

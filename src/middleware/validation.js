@@ -91,8 +91,8 @@ const validationRules = {
       .withMessage('User ID must be between 1-100 characters'),
     body('category')
       .optional()
-      .isIn(['packages', 'matrix', 'lottery'])
-      .withMessage('Category must be one of: packages, matrix, lottery'),
+      .isIn(['packages', 'matrix', 'lottery', 'passive_income'])
+      .withMessage('Category must be one of: packages, matrix, lottery, passive_income'),
     body('orderDescription')
       .optional()
       .isLength({ max: 500 })
@@ -107,8 +107,8 @@ const validationRules = {
       .withMessage('Invalid withdrawal ID format'),
     query('category')
       .optional()
-      .isIn(['packages', 'matrix', 'lottery'])
-      .withMessage('Category must be one of: packages, matrix, lottery')
+      .isIn(['packages', 'matrix', 'lottery', 'passive_income'])
+      .withMessage('Category must be one of: packages, matrix, lottery, passive_income')
   ],
   
   getUserWithdrawals: [
@@ -119,8 +119,8 @@ const validationRules = {
       .withMessage('Invalid user ID format'),
     query('category')
       .optional()
-      .isIn(['packages', 'matrix', 'lottery'])
-      .withMessage('Category must be one of: packages, matrix, lottery'),
+      .isIn(['packages', 'matrix', 'lottery', 'passive_income'])
+      .withMessage('Category must be one of: packages, matrix, lottery, passive_income'),
     query('status')
       .optional()
       .isIn(['pending', 'processing', 'sending', 'completed', 'failed', 'cancelled', 'expired'])
