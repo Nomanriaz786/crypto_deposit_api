@@ -131,7 +131,10 @@ config.getCategoryConfig = (category) => {
     return {
       apiKey: config.nowPayments.apiKey, // This will be the sandbox API key
       ipnSecret: config.nowPayments.ipnSecret, // This will be the sandbox IPN secret
+      authEmail: process.env.NOWPAYMENTS_SANDBOX_AUTH_EMAIL_PASSIVE_INCOME, // Sandbox auth email for withdrawals
+      authPassword: process.env.NOWPAYMENTS_SANDBOX_AUTH_PASSWORD_PASSIVE_INCOME, // Sandbox auth password for withdrawals
       collection: categoryConfig.collection,
+      withdrawalCollection: categoryConfig.withdrawalCollection,
       baseUrl: config.nowPayments.baseUrl,
       isSandbox: config.nowPayments.isSandbox
     };
