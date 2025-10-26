@@ -11,7 +11,7 @@ const router = express.Router();
  */
 router.post('/ipn',
   webhookLimiter,
-  webhookController.handleIPN
+  webhookController.handleIPN.bind(webhookController)
 );
 
 module.exports = router;
