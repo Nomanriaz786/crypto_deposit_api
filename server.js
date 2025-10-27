@@ -44,8 +44,29 @@ if (config.nodeEnv === 'development') {
 app.use(healthCheck);
 
 // Body parser middleware
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+// Capture raw body for webhook signature verification (NOWPayments signs raw payload)
+app.use(bodyParser.json({
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    try {
+      req.rawBody = buf.toString();
+    } catch (e) {
+      req.rawBody = undefined;
+    }
+  }
+}));
+
+app.use(bodyParser.urlencoded({
+  extended: true,
+  limit: '10mb',
+  verify: (req, res, buf) => {
+    try {
+      req.rawBody = buf.toString();
+    } catch (e) {
+      req.rawBody = undefined;
+    }
+  }
+}));
 
 // Rate limiting
 app.use('/api', generalLimiter);

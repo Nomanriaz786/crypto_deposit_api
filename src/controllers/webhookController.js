@@ -8,16 +8,17 @@ class WebhookController {
     try {
       const webhookData = req.body;
       const receivedSignature = req.headers['x-nowpayments-sig'];
+      const rawBody = req.rawBody; // Captured by bodyParser verify function
       
       console.log('IPN Webhook received:', JSON.stringify(webhookData, null, 2));
 
       // Determine if this is a payment or withdrawal webhook
       if (webhookData.payment_id) {
         // This is a payment webhook
-        return await this.handlePaymentIPN(webhookData, receivedSignature, res);
+        return await this.handlePaymentIPN(webhookData, receivedSignature, rawBody, res);
       } else if (webhookData.withdrawal_id) {
         // This is a withdrawal webhook
-        return await this.handleWithdrawalIPN(webhookData, receivedSignature, res);
+        return await this.handleWithdrawalIPN(webhookData, receivedSignature, rawBody, res);
       } else {
         console.error('Unknown webhook type - missing payment_id or withdrawal_id');
         return res.status(400).json({ error: 'Unknown webhook type' });
@@ -35,14 +36,14 @@ class WebhookController {
     }
   }
 
-  async handlePaymentIPN(webhookData, receivedSignature, res) {
+  async handlePaymentIPN(webhookData, receivedSignature, rawBody, res) {
     // Validate webhook data
     if (!webhookData.payment_id) {
       console.error('Missing payment_id in webhook data');
       return res.status(400).json({ error: 'Missing payment_id' });
     }
 
-    // Convert payment_id to string (NOWPayments sends as number)
+    // CRITICAL FIX: Convert payment_id to string (NOWPayments sends as number)
     const paymentId = String(webhookData.payment_id);
     webhookData.payment_id = paymentId; // Update for consistency
 
@@ -60,9 +61,6 @@ class WebhookController {
     if (!category) {
       console.error(`⚠️ Payment not found in any collection: ${paymentId}`);
       console.error(`Webhook data:`, JSON.stringify(webhookData, null, 2));
-      
-      // CRITICAL: Return 200 to prevent NOWPayments retry loop
-      // Log the webhook for manual processing later
       return res.status(200).json(successResponse(
         { 
           payment_id: paymentId, 
@@ -78,10 +76,56 @@ class WebhookController {
     const nowPaymentsService = createNowPaymentsService(category);
     const paymentFirestoreService = createPaymentFirestoreService(config.getCollectionForCategory(category));
 
-    // Verify IPN signature using scenario-specific service
-    if (!nowPaymentsService.verifyIPNSignature(webhookData, receivedSignature)) {
-      console.error('Invalid IPN signature');
-      return res.status(401).json({ error: 'Invalid signature' });
+    // Verify IPN signature using raw request body when available
+    try {
+      const categoryConfig = config.getCategoryConfig(category);
+      const ipnSecret = categoryConfig.ipnSecret;
+      const isSandbox = !!categoryConfig.isSandbox;
+
+      // Use rawBody if present (preserves exact formatting used to compute signature)
+      const payloadString = (typeof rawBody === 'string' && rawBody.length > 0)
+        ? rawBody
+        : JSON.stringify(webhookData);
+
+      if (!ipnSecret) {
+        if (isSandbox) {
+          console.warn(`🏖️ SANDBOX MODE (${category}): No IPN secret configured, skipping signature verification`);
+        } else {
+          console.warn(`IPN secret not configured for category ${category} - skipping signature verification`);
+        }
+      } else {
+        if (!receivedSignature) {
+          if (isSandbox) {
+            console.warn(`🏖️ SANDBOX MODE (${category}): No signature provided, allowing due to sandbox`);
+          } else {
+            console.error('No signature provided in IPN request');
+            return res.status(401).json({ error: 'Missing signature' });
+          }
+        } else {
+          const expectedSignature = crypto.createHmac('sha512', ipnSecret).update(payloadString).digest('hex');
+          const receivedBuf = Buffer.from(receivedSignature, 'hex');
+          const expectedBuf = Buffer.from(expectedSignature, 'hex');
+
+          let signaturesMatch = false;
+          if (receivedBuf.length === expectedBuf.length) {
+            signaturesMatch = crypto.timingSafeEqual(receivedBuf, expectedBuf);
+          }
+
+          if (!signaturesMatch) {
+            console.error('IPN signature verification failed');
+            console.error('Expected:', expectedSignature);
+            console.error('Received:', receivedSignature);
+            if (isSandbox) {
+              console.warn(`🏖️ SANDBOX MODE (${category}): Signature mismatch, but allowing due to sandbox limitations`);
+            } else {
+              return res.status(401).json({ error: 'Invalid signature' });
+            }
+          }
+        }
+      }
+    } catch (sigErr) {
+      console.error('Error verifying IPN signature:', sigErr);
+      return res.status(401).json({ error: 'Signature verification error' });
     }
 
     // Increment webhook attempts counter
@@ -474,7 +518,7 @@ class WebhookController {
     return null; // Payment not found in any collection
   }
 
-  async handleWithdrawalIPN(webhookData, receivedSignature, res) {
+  async handleWithdrawalIPN(webhookData, receivedSignature, rawBody, res) {
     // Validate webhook data
     if (!webhookData.withdrawal_id) {
       console.error('Missing withdrawal_id in webhook data');
