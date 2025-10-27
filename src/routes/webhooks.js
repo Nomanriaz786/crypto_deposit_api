@@ -5,7 +5,7 @@ const { webhookLimiter } = require('../middleware');
 const router = express.Router();
 
 /**
- * @route   POST /api/webhook/ipn
+ * @route   POST /api/webhooks/ipn
  * @desc    Handle NOWPayments IPN (Instant Payment Notification) webhook for both payments and withdrawals
  * @access  Public (NOWPayments webhook)
  */

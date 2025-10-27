@@ -230,7 +230,7 @@ class NOWPaymentsService {
 
       // Add IPN callback URL only if not in sandbox mode or if it's a public URL
       if (!this.isSandbox || (config.baseUrl && !config.baseUrl.includes('localhost'))) {
-        payload.ipn_callback_url = `${config.baseUrl.replace(/\/$/, '')}/api/webhook/ipn`;
+        payload.ipn_callback_url = `${config.baseUrl.replace(/\/$/, '')}/api/webhooks/ipn`;
       }
 
       console.log('NOWPayments create payment payload:', JSON.stringify(payload, null, 2));
@@ -321,7 +321,7 @@ class NOWPaymentsService {
           address: withdrawalData.address,
           currency: withdrawalData.currency.toLowerCase(),
           amount: parseFloat(withdrawalData.amount),
-          ipn_callback_url: withdrawalData.ipnCallbackUrl || `${config.baseUrl.replace(/\/$/, '')}/api/webhook/withdrawal/ipn`
+          ipn_callback_url: withdrawalData.ipnCallbackUrl || `${config.baseUrl.replace(/\/$/, '')}/api/webhooks/withdrawal/ipn`
         }]
       };
 

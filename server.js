@@ -53,7 +53,7 @@ app.use('/api', generalLimiter);
 // API Routes
 app.use('/api/payments', paymentRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/webhook', webhookRoutes);
+app.use('/api/webhooks', webhookRoutes);
 app.use('/api/withdrawals', withdrawalRoutes);
 app.use('/api', utilityRoutes);
 
