@@ -42,14 +42,37 @@ class WebhookController {
       return res.status(400).json({ error: 'Missing payment_id' });
     }
 
-    // Determine category by checking all collections
-    const category = await this.determineCategory(webhookData.payment_id);
+    // Convert payment_id to string (NOWPayments sends as number)
+    const paymentId = String(webhookData.payment_id);
+    webhookData.payment_id = paymentId; // Update for consistency
+
+    // Determine category by checking all collections (with retry for Firestore eventual consistency)
+    let category = await this.determineCategory(paymentId);
+    
+    // If not found immediately, wait and retry (Firestore replication delay)
     if (!category) {
-      console.error(`Payment not found in any collection: ${webhookData.payment_id}`);
-      return res.status(404).json({ error: 'Payment not found' });
+      console.warn(`Payment ${paymentId} not found, retrying in 1 second...`);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      category = await this.determineCategory(paymentId);
+    }
+    
+    // Still not found after retry
+    if (!category) {
+      console.error(`⚠️ Payment not found in any collection: ${paymentId}`);
+      console.error(`Webhook data:`, JSON.stringify(webhookData, null, 2));
+      
+      // CRITICAL: Return 200 to prevent NOWPayments retry loop
+      // Log the webhook for manual processing later
+      return res.status(200).json(successResponse(
+        { 
+          payment_id: paymentId, 
+          warning: 'Payment not found yet - will be processed when payment creation completes' 
+        },
+        'Webhook received but payment not found yet'
+      ));
     }
 
-    console.log(`Payment ${webhookData.payment_id} belongs to category: ${category}`);
+    console.log(`Payment ${paymentId} belongs to category: ${category}`);
 
     // Create category-specific services
     const nowPaymentsService = createNowPaymentsService(category);
@@ -428,6 +451,8 @@ class WebhookController {
   }
 
   async determineCategory(paymentId) {
+    // Ensure paymentId is a string (NOWPayments may send as number)
+    const paymentIdStr = String(paymentId);
     const categories = ['packages', 'matrix', 'lottery'];
     
     for (const category of categories) {
@@ -435,12 +460,13 @@ class WebhookController {
         const collectionName = config.getCollectionForCategory(category);
         
         // Try to get the document from this collection
-        const payment = await firestoreService.getDocument(collectionName, paymentId);
+        const payment = await firestoreService.getDocument(collectionName, paymentIdStr);
         if (payment) {
           return category;
         }
       } catch (error) {
         // Continue to next category if not found
+        console.error(`Error getting document from ${collectionName}:`, error.message);
         continue;
       }
     }
@@ -455,14 +481,18 @@ class WebhookController {
       return res.status(400).json({ error: 'Missing withdrawal_id' });
     }
 
+    // CRITICAL FIX: Convert withdrawal_id to string (NOWPayments may send as number)
+    const withdrawalId = String(webhookData.withdrawal_id);
+    webhookData.withdrawal_id = withdrawalId;
+
     // Determine category by checking all withdrawal collections
-    const category = await this.determineWithdrawalCategory(webhookData.withdrawal_id);
+    const category = await this.determineWithdrawalCategory(withdrawalId);
     if (!category) {
-      console.error(`Withdrawal not found in any collection: ${webhookData.withdrawal_id}`);
+      console.error(`Withdrawal not found in any collection: ${withdrawalId}`);
       return res.status(404).json({ error: 'Withdrawal not found' });
     }
 
-    console.log(`Withdrawal ${webhookData.withdrawal_id} belongs to category: ${category}`);
+    console.log(`Withdrawal ${withdrawalId} belongs to category: ${category}`);
 
     // Create category-specific services
     const nowPaymentsService = createNowPaymentsService(category);
@@ -532,6 +562,8 @@ class WebhookController {
   }
 
   async determineWithdrawalCategory(withdrawalId) {
+    // Ensure withdrawalId is a string (NOWPayments may send as number)
+    const withdrawalIdStr = String(withdrawalId);
     const categories = ['packages', 'matrix', 'lottery'];
 
     for (const category of categories) {
@@ -539,12 +571,13 @@ class WebhookController {
         const collectionName = config.getWithdrawalCollectionForCategory(category);
 
         // Try to get the document from this collection
-        const withdrawal = await firestoreService.getDocument(collectionName, withdrawalId);
+        const withdrawal = await firestoreService.getDocument(collectionName, withdrawalIdStr);
         if (withdrawal) {
           return category;
         }
       } catch (error) {
         // Continue to next category if not found
+        console.error(`Error getting withdrawal from ${collectionName}:`, error.message);
         continue;
       }
     }
