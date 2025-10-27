@@ -28,6 +28,17 @@ router.get('/:paymentId',
 );
 
 /**
+ * @route   GET /api/payments/status/:paymentId
+ * @desc    Get payment status by payment ID (alias for backward compatibility)
+ * @access  Public
+ */
+router.get('/status/:paymentId',
+  validationRules.getPaymentStatus,
+  validate,
+  paymentController.getPaymentStatus
+);
+
+/**
  * @route   GET /api/payments/:paymentId/refresh
  * @desc    Refresh payment status from NOWPayments API
  * @access  Public
