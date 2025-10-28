@@ -1,5 +1,6 @@
 const axios = require('axios');
 const crypto = require('crypto');
+const speakeasy = require('speakeasy');
 const config = require('../config');
 const { ApiError } = require('../utils/errors');
 
@@ -12,6 +13,7 @@ class NOWPaymentsService {
       this.ipnSecret = categoryConfig.ipnSecret;
       this.authEmail = categoryConfig.authEmail;
       this.authPassword = categoryConfig.authPassword;
+      this.twoFaSecret = categoryConfig.twoFaSecret; // 2FA secret for automatic verification
       this.baseUrl = categoryConfig.baseUrl;
       this.isSandbox = categoryConfig.isSandbox;
       this.category = category;
@@ -347,6 +349,67 @@ class NOWPaymentsService {
         headers: error.response?.headers
       });
       throw error;
+    }
+  }
+
+  /**
+   * Generate 2FA verification code using the secret key
+   * @returns {string} 6-digit 2FA code
+   */
+  generate2FACode() {
+    if (!this.twoFaSecret) {
+      throw new Error('2FA secret not configured for this category');
+    }
+
+    const code = speakeasy.totp({
+      secret: this.twoFaSecret,
+      encoding: 'base32'
+    });
+
+    console.log(`🔐 Generated 2FA code for payout verification`);
+    return code;
+  }
+
+  /**
+   * Verify payout using 2FA code
+   * @param {string} batchWithdrawalId - The batch withdrawal ID to verify
+   * @param {string} verificationCode - Optional manual verification code (if not provided, auto-generates)
+   * @returns {Promise<Object>} Verification response
+   */
+  async verifyPayout(batchWithdrawalId, verificationCode = null) {
+    try {
+      // Ensure we have a valid JWT token
+      if (!this.jwtToken) {
+        console.log('🔐 No JWT token found, authenticating for payout verification...');
+        const authSuccess = await this.authenticate();
+        if (!authSuccess) {
+          throw new Error('Failed to authenticate with NOWPayments for payout verification');
+        }
+      }
+
+      // Generate 2FA code if not provided
+      const code = verificationCode || this.generate2FACode();
+
+      console.log(`🔍 Verifying payout with batch ID: ${batchWithdrawalId}`);
+
+      const response = await this.payoutClient.post(`/payout/${batchWithdrawalId}/verify`, {
+        verification_code: code
+      });
+
+      console.log(`✅ Payout verified successfully:`, response.data);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('❌ Payout verification error:', error);
+      console.error('Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      });
+
+      throw new Error(`Payout verification failed: ${error.response?.data?.message || error.message}`);
     }
   }
 

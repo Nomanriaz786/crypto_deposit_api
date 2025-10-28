@@ -19,6 +19,7 @@ const config = {
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_PACKAGES,
         authEmail: process.env.NOWPAYMENTS_AUTH_EMAIL_PACKAGES,
         authPassword: process.env.NOWPAYMENTS_AUTH_PASSWORD_PACKAGES,
+        twoFaSecret: process.env.NOWPAYMENTS_2FA_SECRET_PACKAGES, // For automatic payout verification
         collection: 'payments',
         withdrawalCollection: 'withdrawals'
       },

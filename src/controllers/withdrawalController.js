@@ -89,7 +89,20 @@ class WithdrawalController {
 
       // Extract withdrawal data from NOWPayments response
       const nowWithdrawal = nowWithdrawalData.data.withdrawals[0];
+      const batchWithdrawalId = nowWithdrawal.batch_withdrawal_id;
       console.log('📦 Extracted withdrawal data:', JSON.stringify(nowWithdrawal, null, 2));
+
+      // Automatically verify the payout using 2FA
+      try {
+        console.log(`🔐 Auto-verifying payout with batch ID: ${batchWithdrawalId}...`);
+        const verificationResult = await nowPaymentsService.verifyPayout(batchWithdrawalId);
+        console.log('✅ Payout auto-verified successfully:', verificationResult);
+      } catch (verifyError) {
+        console.error('⚠️ Auto-verification failed:', verifyError.message);
+        console.error('Payout will remain in CREATING status until manually verified');
+        // Don't throw - let the withdrawal be created even if verification fails
+        // User can manually verify later
+      }
 
       // Save withdrawal to Firestore
       const withdrawal = await withdrawalFirestoreService.createWithdrawal({
