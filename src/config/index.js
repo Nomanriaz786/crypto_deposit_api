@@ -28,6 +28,7 @@ const config = {
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_MATRIX,
         authEmail: process.env.NOWPAYMENTS_AUTH_EMAIL_MATRIX,
         authPassword: process.env.NOWPAYMENTS_AUTH_PASSWORD_MATRIX,
+        twoFaSecret: process.env.NOWPAYMENTS_2FA_SECRET_MATRIX, // For automatic payout verification
         collection: 'matrix_payments',
         withdrawalCollection: 'matrix_withdrawals'
       },
@@ -36,6 +37,7 @@ const config = {
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_LOTTERY,
         authEmail: process.env.NOWPAYMENTS_AUTH_EMAIL_LOTTERY,
         authPassword: process.env.NOWPAYMENTS_AUTH_PASSWORD_LOTTERY,
+        twoFaSecret: process.env.NOWPAYMENTS_2FA_SECRET_LOTTERY, // For automatic payout verification
         collection: 'lottery_payments',
         withdrawalCollection: 'lottery_withdrawals'
       },
@@ -44,6 +46,7 @@ const config = {
         ipnSecret: process.env.NOWPAYMENTS_IPN_SECRET_PASSIVE_INCOME,
         authEmail: process.env.NOWPAYMENTS_AUTH_EMAIL_PASSIVE_INCOME,
         authPassword: process.env.NOWPAYMENTS_AUTH_PASSWORD_PASSIVE_INCOME,
+        twoFaSecret: process.env.NOWPAYMENTS_2FA_SECRET_PASSIVE_INCOME, // For automatic payout verification
         collection: 'passive_income_payments',
         withdrawalCollection: 'passive_income_withdrawals'
       }

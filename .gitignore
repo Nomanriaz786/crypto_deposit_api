@@ -86,3 +86,5 @@ jspm_packages/
 # Local development files
 .DS_Store
 Thumbs.db
+2fa/
+2fa/*.png
