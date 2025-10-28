@@ -16,11 +16,12 @@ class WebhookController {
       if (webhookData.payment_id) {
         // This is a payment webhook
         return await this.handlePaymentIPN(webhookData, receivedSignature, rawBody, res);
-      } else if (webhookData.withdrawal_id) {
-        // This is a withdrawal webhook
+      } else if (webhookData.batch_withdrawal_id || (webhookData.id && webhookData.currency && webhookData.address)) {
+        // This is a withdrawal webhook (has batch_withdrawal_id or id+currency+address)
         return await this.handleWithdrawalIPN(webhookData, receivedSignature, rawBody, res);
       } else {
-        console.error('Unknown webhook type - missing payment_id or withdrawal_id');
+        console.error('Unknown webhook type - missing payment_id or withdrawal identifiers');
+        console.error('Webhook data:', webhookData);
         return res.status(400).json({ error: 'Unknown webhook type' });
       }
 
@@ -518,44 +519,78 @@ class WebhookController {
     return null; // Payment not found in any collection
   }
 
+  async findWithdrawalByNowPaymentsId(nowpaymentsId) {
+    // Ensure nowpaymentsId is a string
+    const nowpaymentsIdStr = String(nowpaymentsId);
+    const categories = ['packages', 'matrix', 'lottery'];
+    
+    for (const category of categories) {
+      try {
+        const collectionName = config.getWithdrawalCollectionForCategory(category);
+        
+        // Query for withdrawal with this NOWPayments ID in metadata
+        const withdrawals = await firestoreService.queryDocuments(
+          collectionName,
+          [{ field: 'metadata.nowpayments_withdrawal_id', operator: '==', value: nowpaymentsIdStr }]
+        );
+        
+        if (withdrawals && withdrawals.length > 0) {
+          return {
+            category: category,
+            withdrawal_id: withdrawals[0].withdrawal_id,
+            withdrawal: withdrawals[0]
+          };
+        }
+      } catch (error) {
+        // Continue to next category if not found
+        console.error(`Error querying withdrawals from ${collectionName}:`, error.message);
+        continue;
+      }
+    }
+    
+    return null; // Withdrawal not found in any collection
+  }
+
   async handleWithdrawalIPN(webhookData, receivedSignature, rawBody, res) {
-    // Validate webhook data
-    if (!webhookData.withdrawal_id) {
-      console.error('Missing withdrawal_id in webhook data');
-      return res.status(400).json({ error: 'Missing withdrawal_id' });
+    // Validate webhook data - NOWPayments sends 'id' for withdrawal webhooks, not 'withdrawal_id'
+    const nowpaymentsWithdrawalId = webhookData.id;
+    if (!nowpaymentsWithdrawalId) {
+      console.error('Missing withdrawal id in webhook data');
+      return res.status(400).json({ error: 'Missing withdrawal id' });
     }
 
-    // CRITICAL FIX: Convert withdrawal_id to string (NOWPayments may send as number)
-    const withdrawalId = String(webhookData.withdrawal_id);
-    webhookData.withdrawal_id = withdrawalId;
+    console.log(`🔍 Looking for withdrawal with NOWPayments ID: ${nowpaymentsWithdrawalId}`);
 
-    // Determine category by checking all withdrawal collections
-    const category = await this.determineWithdrawalCategory(withdrawalId);
+    // Find withdrawal by NOWPayments withdrawal ID in metadata
+    const category = await this.findWithdrawalByNowPaymentsId(nowpaymentsWithdrawalId);
     if (!category) {
-      console.error(`Withdrawal not found in any collection: ${withdrawalId}`);
+      console.error(`Withdrawal with NOWPayments ID ${nowpaymentsWithdrawalId} not found in any collection`);
       return res.status(404).json({ error: 'Withdrawal not found' });
     }
 
-    console.log(`Withdrawal ${withdrawalId} belongs to category: ${category}`);
+    console.log(`Withdrawal with NOWPayments ID ${nowpaymentsWithdrawalId} belongs to category: ${category.category}`);
 
     // Create category-specific services
-    const nowPaymentsService = createNowPaymentsService(category);
-    const withdrawalFirestoreService = createWithdrawalFirestoreService(config.getWithdrawalCollectionForCategory(category));
+    const nowPaymentsService = createNowPaymentsService(category.category);
+    const withdrawalFirestoreService = createWithdrawalFirestoreService(config.getWithdrawalCollectionForCategory(category.category));
 
     // Verify IPN signature using category-specific service
-    if (!nowPaymentsService.verifyIPNSignature(webhookData, receivedSignature)) {
+    if (!nowPaymentsService.verifyIPNSignature(webhookData, receivedSignature, rawBody)) {
       console.error('Invalid withdrawal IPN signature');
       return res.status(401).json({ error: 'Invalid signature' });
     }
 
+    // Use our internal withdrawal_id from the found withdrawal
+    const withdrawalId = category.withdrawal_id;
+
     // Increment webhook attempts counter
-    await withdrawalFirestoreService.incrementWebhookAttempts(webhookData.withdrawal_id);
+    await withdrawalFirestoreService.incrementWebhookAttempts(withdrawalId);
 
     // Find withdrawal in the appropriate collection
-    const withdrawal = await withdrawalFirestoreService.getWithdrawalById(webhookData.withdrawal_id);
+    const withdrawal = await withdrawalFirestoreService.getWithdrawalById(withdrawalId);
 
     console.log(
-      `Processing withdrawal IPN for ${webhookData.withdrawal_id}: ${withdrawal.status} -> ${webhookData.status}`
+      `Processing withdrawal IPN for ${withdrawalId} (NOWPayments: ${nowpaymentsWithdrawalId}): ${withdrawal.status} -> ${webhookData.status}`
     );
 
     // Update withdrawal with webhook data
@@ -566,35 +601,35 @@ class WebhookController {
     };
 
     // Add status-specific fields
-    if (webhookData.tx_hash) updateData.tx_hash = webhookData.tx_hash;
+    if (webhookData.hash) updateData.tx_hash = webhookData.hash;
     if (webhookData.fee) updateData.fee = webhookData.fee;
     if (webhookData.estimated_arrival) updateData.estimated_arrival = webhookData.estimated_arrival;
 
     // Track status changes
-    if (webhookData.status === 'sending') {
+    if (webhookData.status === 'SENDING' || webhookData.status === 'sending') {
       updateData.sending_at = new Date();
-      console.log(`🚀 Withdrawal ${webhookData.withdrawal_id} started sending`);
+      console.log(`🚀 Withdrawal ${withdrawalId} started sending`);
     }
 
-    if (webhookData.status === 'completed') {
+    if (webhookData.status === 'COMPLETED' || webhookData.status === 'completed') {
       updateData.completed_at = new Date();
-      console.log(`✅ Withdrawal ${webhookData.withdrawal_id} completed successfully`);
+      console.log(`✅ Withdrawal ${withdrawalId} completed successfully`);
 
       // TODO: Debit user balance after successful withdrawal
-      // await this.debitUserBalance(withdrawal.user_id, withdrawal.amount, withdrawal.currency, category);
+      // await this.debitUserBalance(withdrawal.user_id, withdrawal.amount, withdrawal.currency, category.category);
     }
 
-    if (webhookData.status === 'failed') {
+    if (webhookData.status === 'FAILED' || webhookData.status === 'failed') {
       updateData.failed_at = new Date();
-      console.log(`❌ Withdrawal ${webhookData.withdrawal_id} failed`);
+      console.log(`❌ Withdrawal ${withdrawalId} failed`);
 
       // TODO: Unlock user balance on failed withdrawal
-      // await this.unlockUserBalance(withdrawal.user_id, withdrawal.amount, withdrawal.currency, category);
+      // await this.unlockUserBalance(withdrawal.user_id, withdrawal.amount, withdrawal.currency, category.category);
     }
 
     // Update withdrawal status
     const updatedWithdrawal = await withdrawalFirestoreService.updateWithdrawalStatus(
-      webhookData.withdrawal_id,
+      withdrawalId,
       updateData
     );
 

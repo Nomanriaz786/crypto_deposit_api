@@ -87,6 +87,10 @@ class WithdrawalController {
 
       console.log('✅ NOWPayments withdrawal response:', JSON.stringify(nowWithdrawalData, null, 2));
 
+      // Extract withdrawal data from NOWPayments response
+      const nowWithdrawal = nowWithdrawalData.data.withdrawals[0];
+      console.log('📦 Extracted withdrawal data:', JSON.stringify(nowWithdrawal, null, 2));
+
       // Save withdrawal to Firestore
       const withdrawal = await withdrawalFirestoreService.createWithdrawal({
         withdrawal_id: withdrawalId,
@@ -94,19 +98,21 @@ class WithdrawalController {
         amount: parsedAmount,
         currency: currency.trim(),
         withdrawalAddress,
-        status: nowWithdrawalData.data.status || 'pending',
+        status: nowWithdrawal.status || 'pending',
         orderId,
         orderDescription: orderDescription || `Withdrawal for user ${userId} - Category: ${category}`,
-        fee: nowWithdrawalData.data.fee || 0,
-        estimatedArrival: nowWithdrawalData.data.estimated_arrival,
-        txHash: nowWithdrawalData.data.tx_hash,
+        fee: nowWithdrawal.fee,
+        estimatedArrival: nowWithdrawal.estimated_arrival,
+        txHash: nowWithdrawal.hash,
         metadata: {
           ...metadata,
           category,
-          nowpayments_id: nowWithdrawalData.data.id
-          // Removed payout_extra_id since we're not using extra_id for payouts
+          nowpayments_withdrawal_id: nowWithdrawal.id,
+          batch_withdrawal_id: nowWithdrawal.batch_withdrawal_id
         }
       });
+
+      console.log('💾 Withdrawal saved to Firestore:', withdrawalId);
 
       res.status(201).json(successResponse({
         withdrawal_id: withdrawal.withdrawal_id,
