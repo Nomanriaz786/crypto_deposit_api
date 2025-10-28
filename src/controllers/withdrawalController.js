@@ -85,6 +85,8 @@ class WithdrawalController {
         contact_email: metadata?.email // Optional contact email
       });
 
+      console.log('✅ NOWPayments withdrawal response:', JSON.stringify(nowWithdrawalData, null, 2));
+
       // Save withdrawal to Firestore
       const withdrawal = await withdrawalFirestoreService.createWithdrawal({
         withdrawal_id: withdrawalId,
