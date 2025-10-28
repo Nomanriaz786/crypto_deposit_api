@@ -321,7 +321,8 @@ class NOWPaymentsService {
           address: withdrawalData.address,
           currency: withdrawalData.currency.toLowerCase(),
           amount: parseFloat(withdrawalData.amount),
-          ipn_callback_url: withdrawalData.ipnCallbackUrl || `${config.baseUrl.replace(/\/$/, '')}/api/webhooks/withdrawal/ipn`
+          ipn_callback_url: withdrawalData.ipnCallbackUrl || `${config.baseUrl.replace(/\/$/, '')}/api/webhooks/withdrawal/ipn`,
+          is_request_payouts: false // Disable 2FA requirement - process automatically
         }]
       };
 
