@@ -19,12 +19,20 @@ class WithdrawalFirestoreService {
         status: withdrawalData.status || 'pending',
         order_id: withdrawalData.orderId || generateOrderId(withdrawalData.userId),
         order_description: withdrawalData.orderDescription || `Withdrawal for user ${withdrawalData.userId}`,
-        fee: withdrawalData.fee || 0,
-        estimated_arrival: withdrawalData.estimatedArrival,
-        tx_hash: withdrawalData.txHash,
         metadata: withdrawalData.metadata || {},
         webhook_attempts: 0
       };
+
+      // Add optional fields only if they exist (avoid undefined values in Firestore)
+      if (withdrawalData.fee !== undefined && withdrawalData.fee !== null) {
+        withdrawalDoc.fee = parseFloat(withdrawalData.fee);
+      }
+      if (withdrawalData.estimatedArrival) {
+        withdrawalDoc.estimated_arrival = withdrawalData.estimatedArrival;
+      }
+      if (withdrawalData.txHash) {
+        withdrawalDoc.tx_hash = withdrawalData.txHash;
+      }
 
       // Use withdrawal_id as document ID for easy retrieval
       const result = await firestoreService.setDocument(
