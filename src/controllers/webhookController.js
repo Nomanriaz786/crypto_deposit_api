@@ -574,10 +574,53 @@ class WebhookController {
     const nowPaymentsService = createNowPaymentsService(category.category);
     const withdrawalFirestoreService = createWithdrawalFirestoreService(config.getWithdrawalCollectionForCategory(category.category));
 
-    // Verify IPN signature using category-specific service
-    if (!nowPaymentsService.verifyIPNSignature(webhookData, receivedSignature, rawBody)) {
-      console.error('Invalid withdrawal IPN signature');
-      return res.status(401).json({ error: 'Invalid signature' });
+    // Verify IPN signature using raw request body when available
+    try {
+      const categoryConfig = config.getCategoryConfig(category.category);
+      const ipnSecret = categoryConfig.ipnSecret;
+      const isSandbox = !!categoryConfig.isSandbox;
+
+      // Use rawBody if present (preserves exact formatting used to compute signature)
+      const payloadString = (typeof rawBody === 'string' && rawBody.length > 0)
+        ? rawBody
+        : JSON.stringify(webhookData);
+
+      if (!receivedSignature) {
+        if (isSandbox) {
+          console.warn(`🏖️ SANDBOX MODE: No signature provided, but allowing due to sandbox limitations`);
+        } else {
+          console.error('No signature provided in withdrawal IPN request');
+          return res.status(401).json({ error: 'Missing signature' });
+        }
+      } else {
+        // Verify signature
+        const crypto = require('crypto');
+        const expectedSignature = crypto
+          .createHmac('sha512', ipnSecret)
+          .update(payloadString)
+          .digest('hex');
+
+        const isValid = crypto.timingSafeEqual(
+          Buffer.from(receivedSignature, 'hex'),
+          Buffer.from(expectedSignature, 'hex')
+        );
+
+        if (!isValid) {
+          if (isSandbox) {
+            console.warn(`🏖️ SANDBOX MODE: Signature mismatch, but allowing due to sandbox limitations`);
+          } else {
+            console.error('Invalid withdrawal IPN signature');
+            console.error('Expected:', expectedSignature);
+            console.error('Received:', receivedSignature);
+            return res.status(401).json({ error: 'Invalid signature' });
+          }
+        } else {
+          console.log('✅ Withdrawal IPN signature verified successfully');
+        }
+      }
+    } catch (signatureError) {
+      console.error('Error verifying withdrawal IPN signature:', signatureError);
+      return res.status(401).json({ error: 'Signature verification failed' });
     }
 
     // Use our internal withdrawal_id from the found withdrawal
